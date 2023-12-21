@@ -1,20 +1,5 @@
 ﻿namespace Blazr.AsyncAwait;
 
-public static class TaskExtensions
-{
-    public static Task BigDelay(this Task task, int millisecondsDelay)
-    {
-        var state = new BlazrTaskState();
-
-        if (millisecondsDelay < 0)
-            throw new ArgumentOutOfRangeException(nameof(millisecondsDelay));
-
-        state.Timer = new Timer(state.Complete, state, millisecondsDelay, -1);
-
-        return state.Task;
-    }
-}
-
 public static class BlazrTask
 {
     public static Task Delay(int millisecondsDelay)
@@ -53,43 +38,9 @@ public static class BlazrTask
 
         return tcs.Task;
     }
-
-    public static Task Yield(Action continuation)
-    {
-        var tcs = new TaskCompletionSource();
-
-        try
-        {
-            // create a task with nothing to do and start it
-            var yieldingTask = new Task(() => { });
-            yieldingTask.Start();
-
-            // create the continuation
-            yieldingTask.ContinueWith(await =>
-            {
-                try
-                {
-                    // the continuation code
-                    continuation.Invoke();
-                    // finally set the TaskCompletionSource as complete
-                    tcs.SetResult();
-                }
-                catch (Exception exception)
-                {
-                    tcs.SetException(exception);
-                }
-            });
-        }
-        catch (Exception exception)
-        {
-            tcs.SetException(exception);
-        }
-
-        return tcs.Task;
-    }
 }
 
-internal sealed class BlazrTaskState
+file sealed class BlazrTaskState
 {
     private TaskCompletionSource _tcs = new TaskCompletionSource();
     private bool _complete;
