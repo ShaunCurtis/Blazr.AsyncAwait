@@ -1,4 +1,6 @@
-﻿namespace Blazr.AsyncAwait;
+﻿using System.Reflection.Metadata.Ecma335;
+
+namespace Blazr.AsyncAwait;
 
 public static class BlazrTask
 {
@@ -18,23 +20,14 @@ public static class BlazrTask
     {
         var tcs = new TaskCompletionSource();
 
-        try
-        {
-            // create a task with nothing to do and start it
-            var yieldingTask = new Task(() => { });
-            yieldingTask.Start();
+        // create a completed Task
+        var task = Task.CompletedTask;
 
-            // create the continuation
-            yieldingTask.ContinueWith(await =>
-            {
-                // finally set the TaskCompletionSource as complete
-                tcs.TrySetResult();
-            });
-        }
-        catch (Exception exception)
+        // Add a continuation tp set the result on the TaskCompletionSource
+        task.ContinueWith(await =>
         {
-            tcs.SetException(exception);
-        }
+            tcs.TrySetResult();
+        });
 
         return tcs.Task;
     }
