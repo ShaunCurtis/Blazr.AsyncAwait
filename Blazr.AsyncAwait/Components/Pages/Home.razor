@@ -1,0 +1,160 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="___Clicked">Click</button>
+</div>
+
+<div class="bg-dark text-white m-2 p-2">
+    <pre>
+        @_log.ToString()
+    </pre>
+</div>
+
+@code {
+    private System.Text.StringBuilder _log = new();
+
+    private async Task Clicked()
+    {
+        _log.AppendLine($"Processing at {DateTime.Now.ToLongTimeString()}");
+        await DoSomethingAsync();
+        _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+    }
+
+    // Method that does some async work such as calling into the data pipeline
+    // in this instance it fakes it using Task.Delay.
+    private Task DoSomethingAsync()
+        => BlazrTask.Delay(1000);
+
+    private Task _Clicked()
+    {
+        var stateMachine = new Clicked_StateMachine(this);
+        stateMachine.Execute();
+        return stateMachine.Task;
+    }
+
+    private async Task ___Clicked()
+    {
+        _log.AppendLine($"Processing at {DateTime.Now.ToLongTimeString()}");
+        await BlazrTask.Yield();
+        Thread.Sleep(1000);
+        _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+    }
+
+    private void AfterYield()
+    {
+        _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+    }
+
+    private Task __Clicked()
+    {
+        var tcs = new TaskCompletionSource();
+
+        try
+        {
+            // execute the before code
+            _log.AppendLine($"Processing at {DateTime.Now.ToLongTimeString()}");
+
+            // create a task with nothing to do and start it
+            var yieldingTask = new Task(() => { });
+            yieldingTask.Start();
+
+            // create the continuation
+            yieldingTask.ContinueWith(await =>
+                {
+                    try
+                    {
+                        // the coninuation code
+                        _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+                        // finally set the TaskCompletionSource as complete
+                        tcs.SetResult();
+                    }
+                    catch (Exception exception)
+                    {
+                        tcs.SetException(exception);
+                    }
+                });
+        }
+        catch (Exception exception)
+        {
+            tcs.SetException(exception);
+        }
+
+        return tcs.Task;
+    }
+
+    class Clicked_StateMachine
+    {
+        enum State { Start, Step1, }
+        private readonly Home _parent;
+
+        private readonly TaskCompletionSource _tcs = new();
+        private State _state = State.Start;
+        private Task _doSomethingAsync_Task = Task.CompletedTask;
+
+        public Task Task => _tcs.Task;
+
+        public Clicked_StateMachine(Home parent)
+        {
+            _parent = parent;
+        }
+
+        public void Execute()
+        {
+            try
+            {
+                if (_state == State.Start)
+                {
+                    // The code from the start of the method to the first 'await'.
+                    {
+                        _parent._log.AppendLine($"Processing at {DateTime.Now.ToLongTimeString()}");
+                        _doSomethingAsync_Task = _parent.DoSomethingAsync();
+                    }
+                    // Update state and schedule continuation
+                    {
+                        _state = State.Step1;
+                        _doSomethingAsync_Task.ContinueWith(_ => Execute());
+                    }
+                    // all do for this state so return
+                    return;
+                }
+
+                // Step 2
+                if (_state == State.Step1)
+                {
+                    // If the task was cancelled then set _tcs to canceled and return
+                    if (_doSomethingAsync_Task.Status == TaskStatus.Canceled)
+                    {
+                        _tcs.SetCanceled();
+                        return;
+                    }
+
+                    // If the task was faulted then set the exception in _tcs and return
+                    if (_doSomethingAsync_Task.Status == TaskStatus.Faulted)
+                    {
+                        _tcs.SetException(_doSomethingAsync_Task.Exception?.InnerException ?? new Exception("Task just self destructed with no suicide note!"));
+                        return;
+                    }
+
+                    // The code following the first 'await' to the next await or the end.
+                    {
+                        _parent._log.AppendLine($"Processing completed at {DateTime.Now.ToLongTimeString()}");
+                        // No more steps, job done.  Set the Task to complete and finish.
+                        _tcs.SetResult();
+                    }
+                }
+
+            }
+            // Something went wrong.  Pass the error to the caller through the completion task
+            catch (Exception e)
+            {
+                _tcs.SetException(e);
+            }
+        }
+    }
+}
