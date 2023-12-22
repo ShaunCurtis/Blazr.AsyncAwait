@@ -1,10 +1,13 @@
 # What is Task.Yield and TaskDelay?
 
-There are high level code, abstractiung the programmer from the nitty gritty of the *Task Processing Library*.
 
-Let's look at a simple Blazor example: a button click handler.
+`Task.Yield()` is a mechanism for introducing an async yield into a block of code.  It's purpose is to provide a returned running `Task` to the caller.  This causes the caller code blcok to yield back to it's caller.  In general this releases the threading context [either the Scynchonisation Context or the Threadpool] thread to process the next code block in it's queue.
 
-Here's a simple home page:
+It's high level code, abstracting the programmer from the nitty gritty of the *Task Processing Library*.
+
+For a deep dive into it's workings we'll use a simple Blazor example: a button click handler.
+
+Here's a simple home page with a button to carry out some synchronous blocking activity.
 
 ```csharp
 @page "/"
@@ -31,17 +34,15 @@ Welcome to your new app.
         _message = $"Processing at {DateTime.Now.ToLongTimeString()}";
         await Task.Yield();
         // A blocking synchronous operation
-        Thread.Sleep(1000);
+        await TaskHelper.PretendToDoSomethingAsync();
         _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
     }
 }
 ```
 
-Run this and you will see the UI stay responsive, the first message flashes before the blocking code runs and finally displays the second message.
+Run this and you will see the UI stays responsive, the first message is logged and displayed before the blocking code runs and finally displays the second message.
 
 We can build out own version of `Yield` like this.
-
-This code is run on the `Synchronisation Context`.
 
 Create a `TaskCompletionSource`. We'll pass the `Task` associated with it to the caller. 
 
@@ -53,13 +54,13 @@ public static class BlazrTask
         var tcs = new TaskCompletionSource();
 ```
 
-Create a Completed Task i.e. a task with an `awaitable` that is complete.
+Create a completed Task i.e. a task with an `awaitable` that is complete.
 
 ```csharp
         var task = Task.CompletedTask;
 ```
 
-Add a completion to the Task that sets the result of the `TaskCompletionSource`.  This `Posts` the continuation to the Dispatcher on the SC. 
+Add a completion to the Task that sets the result of the `TaskCompletionSource`.  This `Posts` the continuation to the Dispatcher on the current thread/SC. 
 
 ```csharp
         task.ContinueWith(await =>
@@ -68,50 +69,60 @@ Add a completion to the Task that sets the result of the `TaskCompletionSource`.
         });
 ```
 
-What's now queued on the SC is:
+The code finally runs to completion, returning the `tcs` task. 
+
+```csharp
+        return tcs.Task;
+```
+
+The continuation is queued on the current context behind the current execution block.  The current block returns the `tcs` running `Task` to the caller who yields back to the caller, .... 
+
+To understand the wider context, there are some points of knowledge:
+
+1. The Component almost certainly inherits from `ComponentBase` and implements a `IHandleEvent.HandleEventAsync` UI event handler the schedules a render event on the first yield of thw actual handler and after the completion of the handler.
+
+2. Calling `await` in itself doesn't cause a yield.  `await TaskHelper.PretendToDoSomethingAsync` may call a Task based method, but `PretendToDoSomethingAsync` is a block of synchronous code. The continuation code block is executed directly after the call to `PretendToDoSomethingAsync` completes.  There's no continuation created and posted to the current thread.
+
+1. The default continuation behaviour is to schedule the continuation on the current thread.  In the current context, everything runs on the SC.
+ 
+1. The Synchronisation Context prioritizes posted code over UI generated code.  As almost all activity is the result of UI events, it attempts to complete what it's already started before reacting to new UI event. 
+
+After posting the completion the following is queued on the SC:
 
 1. The rest of the code for `Yield`.
 1. The continuation.
 
-When the `Yield` code completes, `Clicked` yields because the returned `Task` is running.  The `IEventHandle.EventHandler` queues a render event onto the renderer's queue.
+The `Yield` code completes.  `Clicked` yields because the returned `Task` is not complete.  The `IHandleEvent.HandleEventAsync` queues a render event onto the renderer's queue.
 
 1. The continuation.
 1. Renderer service action.
 
-Next the continuation is run that sets the `Yield` `Task` to complete.  The continuation for `Clicked` is now queued.
+The continuation runs and sets the `tcs` to complete, and thus it's associated  `Task` to complete.  The continuation for `Clicked` is now queued.
 
 1. Renderer service action.
 1. `Clicked` Continuation.
 
-The Renderer services it's queue, and passes any DOM changes to the Browser DOM which updates the UI [which triggers an `AfterRender` UI Event].
+The Renderer services it's queue, and passes any DOM changes to the Browser DOM which updates the UI [and triggers an `AfterRender` UI Event].
 
 1. `Clicked` Continuation.
 1. `AfterRender` UI Event.
 
-The `Clicked` Continuation completes synchronously.  The `IEventHandle.EventHandler` queues a second render event when it completes.
+The `Clicked` Continuation completes and the `IEventHandle.EventHandler` queues a second render event on the completion of the handler.
 
 1. `AfterRender` UI Event.
 1. Renderer service action.
 
-At this point prioritization comes into play.  The `AfterRender` UI Event is bumped: the Renderer service action is a higher priority.
+At this point prioritization comes into play.  The `AfterRender` UI Event is bumped: the Renderer service action is posted code and has a higher priority.
 
 1. Renderer service action.
 1. `AfterRender` UI Event.
 
-  The Renderer services it's queue, and passes any DOM changes to the Browser DOM which updates the UI [which triggers an `AfterRender` UI Event].
+The Renderer services it's queue, and passes any DOM changes to the Browser DOM which updates the UI [and triggers another `AfterRender` UI Event].
 
 1. `AfterRender` UI Event.
 1. `AfterRender` UI Event.
 
 The two queued `AfterRender` events are run.
 
-
-Return the task from the `TaskCompletionSource`.
-
-```csharp
-        return tcs.Task;
-```
-
-What now gets run depends on what's queued on the SC.  The manager prioritizes posted code over UI events, so    
 
 
