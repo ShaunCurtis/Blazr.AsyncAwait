@@ -4,7 +4,6 @@ namespace Blazr.AsyncAwait;
 
 public static class TaskHelper
 {
-
     /// <summary>
     ///  Method that does some async work such as calling into the data pipeline
     /// in this instance it fakes it using Task.Delay.

@@ -32,20 +32,36 @@ Welcome to your new app.
     private async Task Clicked()
     {
         _message = $"Processing at {DateTime.Now.ToLongTimeString()}";
-        await DoSomethingAsync();
+        await TaskHelper.DoSomethingAsync();
         _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
     }
 
     private async Task _Clicked()
     {
         _message = $"Processing at {DateTime.Now.ToLongTimeString()}";
-        await PretendToDoSomethingAsync();
+        await TaskHelper.PretendToDoSomethingAsync();
         _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
     }
 }
 ```
 
 *Responsive Click* steps through the two messages.  *Unresponsive Click* shows both messages at the end. 
+
+`TaskHelper` looks like this:
+
+```csharp
+public static class TaskHelper
+{
+    public static Task DoSomethingAsync()
+        => Task.Delay(1000);
+
+    public static Task PretendToDoSomethingAsync()
+    {
+        Thread.Sleep(1000);
+        return Task.CompletedTask;
+    }
+}
+```
 
 Those three lines are transposed into lower level C# code that implements a state machine.
 
@@ -59,18 +75,11 @@ Those three lines are transposed into lower level C# code that implements a stat
  
 1. It uses a `TaskCompletionSource` to control the task provided by the state machine.
 
+1. There are global `Task` variables for all the async methods called.  In this case `_task1_Task` to assign `DoSomethingAsync` to when we call it.
 
-When the compiler excounters that `async` and finds an `await` in the code block it totally rebuilds the code into a state machine class.
-
-The class framework for `Clicked` looks like this.
-
-1. It's within the primary class, so has access to all the private resources of the parent.
-1. There's only one yield, so there's only two states: *Start* and *Step1*.
-2. The constructor requires a reference to the parent.
-3. We use a `TaskCompletionSource` to control the task we return to the caller.
-4. There are global `Task` variables for all the async methods called.  In this case `_doSomethingAsync_Task` to assign `DoSomethingAsync` to when we call it.
-5. The initial `_state` is set to `Start`.
-6. The state machine is run by calling `Execute`.
+1. The initial `_state` is set to `0`.
+ 
+1. The state machine is run by calling `Execute`.
 
 ```csharp
     class Clicked_StateMachine
@@ -80,7 +89,7 @@ The class framework for `Clicked` looks like this.
 
         private readonly TaskCompletionSource _tcs = new();
         private State _state = State.Start;
-        private Task _doSomethingAsync_Task = Task.CompletedTask;
+        private Task _state1_Task = Task.CompletedTask;
 
         public Task Task => _tcs.Task;
 
@@ -110,59 +119,85 @@ public void Execute()
     }
 }
 ```
-The *Start* step runs the code up to the first `await`.  It sets the message, calls `DoSomethingAsync` on the parent and assigns it to `_doSomethingAsync_Task`.  It sets the `_state` to the next state and sets the continuation on the first Task.  The continuation is a recursion: it calls itself.  The order here is critical.  The continuation isn't set when the Task is originally called because at that point `_state` is still `State.Start` and we create a black hole.
-
-If `_doSomethingAsync_Task` is already complete the continuation will get scheduled immediately.
+The *Start* step runs the code up to the first `await`.  It sets the message, calls `DoSomethingAsync` on the parent and assigns it to `_state1_Task`.  It sets the `_state` to the next state.  It then checks the state of `_state1_Task`.  The key observation to make is that if the task has yielded then a continuation is set on the task to call `Execute` when it completes.  If it has an exception or is cancelled then the appropriate state is set on the _taskManager.  If th task is complete then the method falls through into the next state and executes the next step synchronously.  There's no continuation and no yield.
 
 ```csharp
-    if (_state == State.Start)
+    if (_state == 0)
     {
         // The code from the start of the method to the first 'await'.
         {
-            _parent._message = $"Processing at {DateTime.Now.ToLongTimeString()}";
-            _doSomethingAsync_Task = _parent.DoSomethingAsync();
+            _parent._log.AppendLine($"State Machine Processing at {DateTime.Now.ToLongTimeString()}");
         }
-        // Update state and schedule continuation
-        {
-            _state = State.Step1;
-            _doSomethingAsync_Task.ContinueWith(_ => Execute());
-        }
-        // all do for this state so return
-        return;
+
+        _state1_Task = TaskHelper.DoSomethingAsync();
+
+        _state = 1;
+
+        if (this.ReturnOnTaskStatus(_state1_Task))
+            return;
     }
 ```
-Step 2 is run when `_doSomethingAsync_Task` completes and the continuation is run.  It checks for errors or a cancellation and applies these to the `TaskCompletionSource` if they have occured.
 
-It then runs the code to completion [sets the message] and finally sets the result on the `TaskCompletionSource`: this sets it to completed.
+The two task check methods look like this.  `HandleTaskErrorOrCancellation` handles exceptions and Cancellation.  `ReturnOnTaskStatus` detects if the task ran synchronously and if it did returns `false`.
 
 ```csharp
-    // Step 2
-    if (_state == State.Step1)
+private bool ReturnOnTaskStatus(Task task)
+{
+    if (task.IsCompleted)
+        return false;
+
+    if (!task.IsCompleted)
     {
-        // If the task was cancelled then set _tcs to canceled and return
-        if (_doSomethingAsync_Task.Status == TaskStatus.Canceled)
-        {
-            _tcs.SetCanceled();
+        task.ContinueWith(_ => Execute());
+        return true;
+    }
+
+    return HandleTaskErrorOrCancellation(task);
+}
+
+private bool HandleTaskErrorOrCancellation(Task task)
+{
+
+    if (task.Status == TaskStatus.Canceled)
+    {
+        _taskManager.SetCanceled();
+        return true;
+    }
+
+    if (task.Status == TaskStatus.Faulted)
+    {
+        _taskManager.SetException(task.Exception?.InnerException ?? new Exception("Task just self destructed with no suicide note!"));
+        return true;
+    }
+
+    return false;
+}
+```
+Step 2 checks the stste of `_state1_Task` for exceptions and cancellation.  It then runs the code to completion [sets the message].  As there's no further awaits it falls out of the bottom to the finalization process.
+
+```csharp
+    // Step 1 - the first await block
+    if (_state == 1)
+    {
+        if (this.HandleTaskErrorOrCancellation(_state1_Task))
             return;
+
+        {
+            _parent._log.AppendLine($"State Machine Processing completed at {DateTime.Now.ToLongTimeString()}");
         }
 
-        // If the task was faulted then set the exception in _tcs and return
-        if (_doSomethingAsync_Task.Status == TaskStatus.Faulted)
-        {
-            _tcs.SetException(_doSomethingAsync_Task.Exception?.InnerException ?? new Exception("DoSomethingAsync just self destructed with no suicide note!"));
-            return;
-        }
-
-        // The code following the first 'await' to the next await or the end.
-        {
-            _parent._message = $"Processing completed at {DateTime.Now.ToLongTimeString()}";
-            // No more steps, job done.  Set the Task to complete and finish.
-            _tcs.SetResult();
-        }
+        //No more await tasks so fall thro to bottom
     }
 ```
 
-Finally plug this code into `Home`.  Note it's no longer `async` and returns a Task to the UI event handler to `await`.
+The finalization process is to set the task manager to complete.
+
+```csharp
+// No more steps, job done.  Set the Task to complete and finish.
+_taskManager.SetResult();
+```
+
+Finally this code is plugged into `Clicked` in `Home`.  Note it's no longer `async` and returns a Task from the state machine to the UI event handler.
 
 ```csharp
     private Task Clicked()
