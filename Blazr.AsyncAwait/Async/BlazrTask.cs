@@ -33,20 +33,20 @@ public static class BlazrTask
     }
 }
 
-file sealed class BlazrTaskState
+internal sealed class BlazrTaskState
 {
-    private TaskCompletionSource _tcs = new TaskCompletionSource();
+    private TaskCompletionSource _stateManager = new TaskCompletionSource();
     private bool _complete;
 
     internal Timer? Timer;
-    internal Task Task => _tcs.Task;
+    internal Task Task => _stateManager.Task;
 
     internal void Complete(object? statusInfo)
     {
         if (!_complete)
         {
             _complete = true;
-            _tcs.TrySetResult();
+            _stateManager.TrySetResult();
             this.Timer?.Dispose();
         }
     }
