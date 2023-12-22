@@ -1,16 +1,12 @@
 # Async/Await
 
-Async/Await is fundamental building material in modern C# coding.  Yet, if you ask most programmes to explain it, they go weak at the knees, head for the nearest coffee machine to consult with whoever's there, and when they final come back , go "Well, waffle, waffle, waffle....".
+Async/Await is fundamental building material in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.
 
-Don't feel ashamed, most programmers can give you the overview, but are very hazy on the detail. 
+Don't feel ashamed if you can't detail how it works: most programmers will say "Well, waffle, waffle, waffle...." after a quick consultation session at the coffee machine with collegues who have a similar shallow knowledge [but aren't prepared to admit it!]. 
 
 In this short article I'll attempt to explain what happens below those high level language directives.
 
-*Async/Await* is high level code.  It abstracts the programmer from the nitty gritty of the *Task Processing Library*.
-
-Let's look at a simple Blazor example: a button click handler.
-
-Here's a simple home page:
+Consider this simple Blazor `Home` page:
 
 ```csharp
 @page "/"
@@ -22,7 +18,8 @@ Here's a simple home page:
 Welcome to your new app.
 
 <div class="mb-3">
-    <button class="btn btn-primary" @onclick="Clicked">Click</button>
+    <button class="btn btn-success" @onclick="Clicked">Responsive Click</button>
+    <button class="btn btn-danger" @onclick="_Clicked">Unresponsive Click</button>
 </div>
 
 <div class="bg-dark text-white m-2 p-2">
@@ -39,16 +36,29 @@ Welcome to your new app.
         _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
     }
 
-    // Method that does some async work such as calling into the data pipeline
-    // in this instance it fakes it using Task.Delay.
-    private Task DoSomethingAsync()
-        => Task.Delay(1000);
+    private async Task _Clicked()
+    {
+        _message = $"Processing at {DateTime.Now.ToLongTimeString()}";
+        await PretendToDoSomethingAsync();
+        _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
+    }
 }
 ```
 
-Run this and you will see the UI stay responsive, displaying the first message when `DoSomethingAsync` yields and the UI event handler requests and gets a component render.
+*Responsive Click* steps through the two messages.  *Unresponsive Click* shows both messages at the end. 
 
-Those three lines in `Clicked` aren't what actually gets compiled into runtime code.
+Those three lines are transposed into lower level C# code that implements a state machine.
+
+`async` is a modifier and `await` is an operator.
+
+1. The state machine is implemented as a class within the owner - in this case `Home`.  This gives it access to the private methods, properties and variables of `Home`. 
+
+2. Each code block between `awaits` is a state.  Think of doing a `split` on `await`: one `await` will produce two states.
+
+1. The constructor requires a reference to the parent - `_parent`.
+ 
+1. It uses a `TaskCompletionSource` to control the task provided by the state machine.
+
 
 When the compiler excounters that `async` and finds an `await` in the code block it totally rebuilds the code into a state machine class.
 
