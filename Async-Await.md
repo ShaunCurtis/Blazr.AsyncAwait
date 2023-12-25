@@ -1,10 +1,10 @@
 # Async/Await
 
-Async/Await is fundamental building material in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.
+Async/Await is fundamental building material in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
 
 Don't feel ashamed if you can't detail how it works: most programmers will say "Well, waffle, waffle, waffle...." after a quick consultation session at the coffee machine with collegues who have a similar shallow knowledge [but aren't prepared to admit it!]. 
 
-In this short article I'll attempt to explain what happens below those high level language directives.
+There are several very good articles available on the subject.  The problem is that they assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortal programmers.
 
 Consider this simple Blazor `Home` page:
 
@@ -45,7 +45,7 @@ Welcome to your new app.
 }
 ```
 
-*Responsive Click* steps through the two messages.  *Unresponsive Click* shows both messages at the end. 
+*Responsive Click* shows each message in turn.  *Unresponsive Click* shows both messages on completion. 
 
 `TaskHelper` looks like this:
 
@@ -63,13 +63,15 @@ public static class TaskHelper
 }
 ```
 
-Those three lines are transposed into lower level C# code that implements a state machine.
+### The Async State Machine 
 
-`async` is a modifier and `await` is an operator.
+When those three lines are compiled they are first transposed into lower level C# code that implements a state machine.
 
-1. The state machine is implemented as a class within the owner - in this case `Home`.  This gives it access to the private methods, properties and variables of `Home`. 
+1. `async` is a modifier and `await` is an operator.
 
-2. Each code block between `awaits` is a state.  Think of doing a `split` on `await`: one `await` will produce two states.
+1. The state machine is implemented as a class within the parent class - in this case `Home`.  This gives it access to the private methods, properties and variables of `Home`. 
+
+2. Each code block between `awaits` is a state.  Think of applying a `split` on `await`: one `await` will produce two states.
 
 1. The constructor requires a reference to the parent - `_parent`.
  
@@ -81,29 +83,31 @@ Those three lines are transposed into lower level C# code that implements a stat
  
 1. The state machine is run by calling `Execute`.
 
+Here's the skeleton for out three liner.
+
 ```csharp
-    class Clicked_StateMachine
+class Clicked_StateMachine
+{
+    enum State { Start, Step1, }
+    private readonly Home _parent;
+
+    private readonly TaskCompletionSource _tcs = new();
+    private State _state = State.Start;
+    private Task _state1_Task = Task.CompletedTask;
+
+    public Task Task => _tcs.Task;
+
+    public Clicked_StateMachine(Home parent)
     {
-        enum State { Start, Step1, }
-        private readonly Home _parent;
-
-        private readonly TaskCompletionSource _tcs = new();
-        private State _state = State.Start;
-        private Task _state1_Task = Task.CompletedTask;
-
-        public Task Task => _tcs.Task;
-
-        public Clicked_StateMachine(Home parent)
-        {
-            _parent = parent;
-        }
-
-        public void Execute()
-        { }
+        _parent = parent;
     }
+
+    public void Execute()
+    { }
+}
 ```
 
-Now for the `Execute` detail.  Execution is wrapped in a `try` so we can pass the exception to the caller through the `TaskCompletionSource`.
+The `Execute` detail.  Execution is wrapped in a `try` so we can pass any exception to the caller through the `TaskCompletionSource`.
 
 ```csharp
 public void Execute()
@@ -119,7 +123,16 @@ public void Execute()
     }
 }
 ```
-The *Start* step runs the code up to the first `await`.  It sets the message, calls `DoSomethingAsync` on the parent and assigns it to `_state1_Task`.  It sets the `_state` to the next state.  It then checks the state of `_state1_Task`.  The key observation to make is that if the task has yielded then a continuation is set on the task to call `Execute` when it completes.  If it has an exception or is cancelled then the appropriate state is set on the _taskManager.  If th task is complete then the method falls through into the next state and executes the next step synchronously.  There's no continuation and no yield.
+The *State 0* step runs the code up to the first `await`.  It:
+
+1. Sets the message. 
+2. Calls `DoSomethingAsync` on the parent and assigns it to `_state1_Task`.  
+3. Sets the `_state` to the next state.  
+4. Checks the state of `_state1_Task`.  
+   
+ - If the task has yielded then a continuation is set on the task to call `Execute` when it completes.  
+ - If it has an exception or is cancelled then the appropriate state is set on the _taskManager.  
+ - If the task is complete then the method falls through into the next state and executes the next step synchronously.  There's no continuation and no yield.
 
 ```csharp
     if (_state == 0)
@@ -138,7 +151,10 @@ The *Start* step runs the code up to the first `await`.  It sets the message, ca
     }
 ```
 
-The two task check methods look like this.  `HandleTaskErrorOrCancellation` handles exceptions and Cancellation.  `ReturnOnTaskStatus` detects if the task ran synchronously and if it did returns `false`.
+The two helper methods look like this.
+
+ - `HandleTaskErrorOrCancellation` handles exceptions and Cancellation.  
+ - `ReturnOnTaskStatus` detects if the task ran synchronously and if it did returns `false`.
 
 ```csharp
 private bool ReturnOnTaskStatus(Task task)
@@ -173,7 +189,7 @@ private bool HandleTaskErrorOrCancellation(Task task)
     return false;
 }
 ```
-Step 2 checks the stste of `_state1_Task` for exceptions and cancellation.  It then runs the code to completion [sets the message].  As there's no further awaits it falls out of the bottom to the finalization process.
+Step 1 first checks `_state1_Task` for exceptions and cancellation.  If it completed successfully it runs the code to completion [sets the message].  As there's no further awaits it falls out of the bottom to the finalization process.
 
 ```csharp
     // Step 1 - the first await block
@@ -210,9 +226,9 @@ Finally this code is plugged into `Clicked` in `Home`.  Note it's no longer `asy
 
 ## The Real Thing
 
-The code I've shown above isn't the actual code generated by the compiler.  That's a little more complicated because the code above doesn't address certain implementation and performance issues: it's fat and slow for the happy path.
+The code I've built above isn't the actual code generated by the compiler.  That's a little more complicated because the code above doesn't address certain implementation and performance issues: it's a bit fat and slow.
 
-However it does hopefully provide a good insight into what's going on.
+However it hopefully provides a good insight into what's going on.
 
 An interesting point is that the state machine is compiled as a `class` in debug mode and a `struct` in release mode. 
 

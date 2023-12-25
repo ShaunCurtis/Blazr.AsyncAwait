@@ -30,10 +30,18 @@ Welcome to your new app.
     /// Standard Clicked event with am intermediate update to demonstrate UI responsiveness
     /// </summary>
     /// <returns></returns>
+    // private async Task Clicked()
+    // {
+    //     _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
+    //     await TaskHelper.DoSomethingAsync();
+    //     _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+    // }
+
     private async Task Clicked()
     {
         _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
-        await TaskHelper.DoSomethingAsync();
+        var awaitable = new EmulateADataPipelineCall(2000);
+        await awaitable;
         _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
     }
 
@@ -44,7 +52,7 @@ Welcome to your new app.
     private async Task _Clicked()
     {
         _log.AppendLine($"Custom Delay Processing at {DateTime.Now.ToLongTimeString()}");
-        await BlazrTask.Delay(1000);
+        await BlazrTask.Delay(50);
         _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
     }
 
