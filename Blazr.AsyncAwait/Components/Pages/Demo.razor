@@ -54,12 +54,6 @@ Welcome to your new app.
         stateMachine.Execute();
         return stateMachine.Task;
     }
-
-    private void Fred(EventCallbackWorkItem item, object? arg)
-    {
-        SynchronizationContext.Current.Post(_ =>  HandleEventAsync(item, arg));
-
-    }
     // {
     //     var uiTask = item.InvokeAsync(arg);
 
@@ -71,6 +65,19 @@ Welcome to your new app.
 
     //     this.StateHasChanged();
     // }
+
+
+    private void Fred(EventCallbackWorkItem item, object? arg)
+    {
+
+        SynchronizationContext.Current?.Post(_ =>
+            {
+                HandleEventAsync(item, arg);
+            },
+            null);
+
+    }
+
 
     /// <summary>
     /// The State Machine for the Clicked Event
@@ -103,7 +110,7 @@ Welcome to your new app.
             {
                 if (_state == 0)
                 {
-                    _state_0_Task = _eventCallbackWorkItem.InvokeAsync(_eventCallbackWorkItemArgs);;
+                    _state_0_Task = _eventCallbackWorkItem.InvokeAsync(_eventCallbackWorkItemArgs);
 
                     _state = 1;
 

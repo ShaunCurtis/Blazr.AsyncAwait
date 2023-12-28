@@ -192,5 +192,108 @@ It checks if `Demo` implements `IHandleEvent`  If so it invokes `HandleEventAsyn
 Basically we get a post to the *Synchronisation Context* queue.
 
 ```
-
+SynchronizationContext.Current?.Post(_ =>
+    {
+        HandleEventAsync(item, arg);
+    },
+    null);
 ```
+
+This executes the refactored  `HandleEventAsync` which creates and executes the `HandleEventAsync_StateMachine` to this line:
+
+```csharp
+    _state_0_Task = _eventCallbackWorkItem.InvokeAsync(_eventCallbackWorkItemArgs); 
+```
+
+This executes the refactored `Clicked` which creates and executes the `Clicked_StateMachine` to this line.  Until now everything has been synchronous code running in sequence and stepping into the methods.
+
+```csharp
+   _state_0_Task = Task.Delay(1000);
+```
+
+`Task.Delay` yields back control to the caller before it's complete.  `Clicked_StateMachine.Execute` adds a continuation to `Clicked_StateMachine._state_0_Task` to call itself and completes.
+
+```csharp
+   _state_0_Task.ContinueWith(_ => Execute());
+```
+
+At this point the context and callstack looks like this:
+
+```text
+IHandleEvent.HandleEventAsync
+  => HandleEventAsync_StateMachine.Execute
+      => Clicked
+        => Clicked_StateMachine.Execute
+```
+
+`Clicked` executes to completion and returns the `Clicked_StateMachine` Task [which is still running] to `HandleEventAsync_StateMachine.Execute`.
+
+This continues and executes this code.  `StateHasChanged` queues a render event onto the Renderer's queue.
+
+```csharp
+    if (!_state_0_Task.IsCompleted)
+    {
+        _parent.StateHasChanged();
+        _state_0_Task.ContinueWith(_ => Execute());
+        return;
+    }
+```
+
+The SC has:
+
+```text
+IHandleEvent.HandleEventAsync
+Renderer Queue Service Request
+
+
+[awaitable Continuation] HandleEventAsync_StateMachine.Execute
+[awaitable Continuatiion] Clicked_StateMachine.Execute.Execute
+[awaitable Continuation] Task.Delay waiting on a Timer Callback
+```
+
+Adds a continuation to `_state_0_Task` to call itself and completes.
+
+```text
+IHandleEvent.HandleEventAsync
+  => HandleEventAsync_StateMachine.Execute
+      => Clicked
+        => Clicked_StateMachine.Execute
+```
+
+`IHandleEvent.HandleEventAsync` runs to completion and passes the `HandleEventAsync_StateMachine` task to the SC.
+
+The SC has:
+
+```text
+Renderer Queue Service Request
+
+
+[awaitable Continuation] HandleEventAsync_StateMachine.Execute
+[awaitable Continuation] Clicked_StateMachine.Execute
+[awaitable Continuation] Task.Delay waiting on a Timer Callback
+```
+
+So it services the Renderer Queue [and renders the component and it's renbder tree where required by Parameter changes].
+
+
+When the timer callback occurs on `Task.Delay(1000)` it sets thw result on it's awaitable Task.
+
+```text
+Clicked_StateMachine.Execute [State 1]
+
+
+[awaitable Continuation] HandleEventAsync_StateMachine.Execute
+```
+
+`Clicked_StateMachine.Execute` runs to completion, calls StateHasChanged and sets the result on the Task.
+
+```text
+HandleEventAsync_StateMachine.Execute [State 1]
+Renderer Queue Service Request
+```
+
+
+
+
+
+

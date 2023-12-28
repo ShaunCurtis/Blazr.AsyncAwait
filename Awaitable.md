@@ -5,7 +5,7 @@ Throughout these discussions I use the term *Threading Context* to describe the 
 1. Management of `System.Threading.Timers` to call callbacks when timers expire.
 2. Management of `Awaiters` which we'll cover here.
 
-Blazor adds extra functionality to manage posting  Renderer activity, such as servicing the Render queue and UI generated events.
+Blazor adds extra functionality to manage posting Renderer activity, such as servicing the Render queue and UI generated events.
 
 The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` which returns an object that implements *IsCompleted/OnCompleted/GetResult* can be awaited by the threading context. 
 
@@ -29,5 +29,7 @@ When an object yields the threading context calls `GetAwaiter` to get an object 
 3. A return result on completion.
 
 We'll look at how this works in practice in the *Async/Await* section.
+
+An important point is that an awaitable completes when it returns a result, not when `IsCompleted` is set. 
 
 
