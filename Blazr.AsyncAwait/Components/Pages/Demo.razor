@@ -1,0 +1,186 @@
+﻿@page "/"
+@implements IHandleEvent
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="Clicked">Standard Click</button>
+</div>
+
+<div class="bg-dark text-white m-2 p-2">
+    <pre>
+        @_log.ToString()
+    </pre>
+</div>
+
+@code {
+    private System.Text.StringBuilder _log = new();
+
+    /// <summary>
+    /// Standard Clicked event with am intermediate update to demonstrate UI responsiveness
+    /// </summary>
+    /// <returns></returns>
+    private async Task Clicked()
+    {
+        _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
+        await BlazrTask.Delay(1000);
+        _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+    }
+
+    /// <summary>
+    /// Method that shifts the async behaviour into Clicked_StateMachine
+    /// </summary>
+    /// <returns></returns>
+    private Task ___Clicked()
+    {
+        var stateMachine = new Clicked_StateMachine(this);
+        stateMachine.Execute();
+        return stateMachine.Task;
+    }
+
+    /// <summary>
+    /// Implements the UI event handler and overides the existing handkler in ComponentBase
+    /// </summary>
+    /// <param name="item"></param>
+    /// <param name="arg"></param>
+    /// <returns></returns>
+    Task HandleEventAsync(EventCallbackWorkItem item, object? arg)
+    {
+        var stateMachine = new HandleEventAsync_StateMachine(this, item, arg);
+        stateMachine.Execute();
+        return stateMachine.Task;
+    }
+
+    private void Fred(EventCallbackWorkItem item, object? arg)
+    {
+        SynchronizationContext.Current.Post(_ =>  HandleEventAsync(item, arg));
+
+    }
+    // {
+    //     var uiTask = item.InvokeAsync(arg);
+
+    //     if (!uiTask.IsCompleted)
+    //     {
+    //         this.StateHasChanged();
+    //         await uiTask;
+    //     }
+
+    //     this.StateHasChanged();
+    // }
+
+    /// <summary>
+    /// The State Machine for the Clicked Event
+    /// </summary>
+    class HandleEventAsync_StateMachine
+    {
+        private readonly Demo _parent;
+        private EventCallbackWorkItem _eventCallbackWorkItem;
+        private object? _eventCallbackWorkItemArgs;
+
+        private readonly TaskCompletionSource _taskManager = new();
+        private int _state = 0;
+
+        // Tasks for each step
+        private Task _state_0_Task = Task.CompletedTask;
+
+        public Task Task => _taskManager.Task;
+
+        public HandleEventAsync_StateMachine(Demo parent, EventCallbackWorkItem item, object? args)
+        {
+            _parent = parent;
+            _eventCallbackWorkItem = item;
+            _eventCallbackWorkItemArgs = args;
+
+        }
+
+        public void Execute()
+        {
+            try
+            {
+                if (_state == 0)
+                {
+                    _state_0_Task = _eventCallbackWorkItem.InvokeAsync(_eventCallbackWorkItemArgs);;
+
+                    _state = 1;
+
+                    if (!_state_0_Task.IsCompleted)
+                    {
+                        _parent.StateHasChanged();
+                        _state_0_Task.ContinueWith(_ => Execute());
+                        return;
+                    }
+                }
+
+                if (_state == 1)
+                {
+                    _parent.StateHasChanged();
+                }
+
+                _taskManager.SetResult();
+
+            }
+            catch (Exception e)
+            {
+                _taskManager.SetException(e);
+            }
+        }
+    }
+
+
+    /// <summary>
+    /// The State Machine for the Clicked Event
+    /// </summary>
+    class Clicked_StateMachine
+    {
+        private readonly Demo _parent;
+
+        private readonly TaskCompletionSource _taskManager = new();
+        private int _state = 0;
+
+        private Task _state_0_Task = Task.CompletedTask;
+
+        public Task Task => _taskManager.Task;
+
+        public Clicked_StateMachine(Demo parent)
+        {
+            _parent = parent;
+        }
+
+        public void Execute()
+        {
+            try
+            {
+                if (_state == 0)
+                {
+                    _parent._log.AppendLine($"State Machine Processing at {DateTime.Now.ToLongTimeString()}");
+                    _state_0_Task = Task.Delay(1000);
+                    _state = 1;
+
+                    if (!_state_0_Task.IsCompleted)
+                    {
+                        _state_0_Task.ContinueWith(_ => Execute());
+                        return;
+                    }
+                }
+
+                if (_state == 1)
+                {
+                    _parent._log.AppendLine($"State Machine Processing completed at {DateTime.Now.ToLongTimeString()}");
+                }
+
+                _taskManager.SetResult();
+
+            }
+            // Something went wrong.  Pass the error to the caller through the completion task
+            catch (Exception e)
+            {
+                _taskManager.SetException(e);
+            }
+        }
+    }
+
+}
