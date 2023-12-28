@@ -1,4 +1,5 @@
-﻿using System.Reflection.Metadata.Ecma335;
+﻿using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
 
 namespace Blazr.AsyncAwait;
 
@@ -33,21 +34,30 @@ public static class BlazrTask
     }
 }
 
-file sealed class BlazrTaskState
+internal sealed class BlazrTaskState
 {
-    private TaskCompletionSource _tcs = new TaskCompletionSource();
+    private static Stopwatch _stopwatch = new Stopwatch();
+    private TaskCompletionSource _stateManager = new TaskCompletionSource();
     private bool _complete;
 
     internal Timer? Timer;
-    internal Task Task => _tcs.Task;
+    internal Task Task => _stateManager.Task;
+
+    public BlazrTaskState()
+    {
+        _stopwatch.Restart();
+    }
 
     internal void Complete(object? statusInfo)
     {
         if (!_complete)
         {
+            Console.WriteLine($"Delay was: {_stopwatch.ElapsedMilliseconds} milliseconds.");
             _complete = true;
-            _tcs.TrySetResult();
+            _stateManager.TrySetResult();
+            // dispose and release the timer for GC.
             this.Timer?.Dispose();
+            this.Timer = null;
         }
     }
 }

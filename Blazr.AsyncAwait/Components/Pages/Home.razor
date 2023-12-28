@@ -30,10 +30,18 @@ Welcome to your new app.
     /// Standard Clicked event with am intermediate update to demonstrate UI responsiveness
     /// </summary>
     /// <returns></returns>
+    // private async Task Clicked()
+    // {
+    //     _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
+    //     await TaskHelper.DoSomethingAsync();
+    //     _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+    // }
+
     private async Task Clicked()
     {
         _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
-        await TaskHelper.DoSomethingAsync();
+        var awaitable = new EmulateADataPipelineCall(2000);
+        await awaitable;
         _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
     }
 
@@ -44,7 +52,7 @@ Welcome to your new app.
     private async Task _Clicked()
     {
         _log.AppendLine($"Custom Delay Processing at {DateTime.Now.ToLongTimeString()}");
-        await BlazrTask.Delay(1000);
+        await BlazrTask.Delay(50);
         _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
     }
 
@@ -94,7 +102,7 @@ Welcome to your new app.
         private int _state = 0;
 
         // Tasks for each step
-        private Task _step1_Task = Task.CompletedTask;
+        private Task _state1_Task = Task.CompletedTask;
 
         public Task Task => _taskManager.Task;
 
@@ -116,7 +124,7 @@ Welcome to your new app.
                     }
 
                     // Start the await Task
-                    _step1_Task = TaskHelper.DoSomethingAsync();
+                    _state1_Task = TaskHelper.DoSomethingAsync();
 
                     // Update state
                     _state = 1;
@@ -126,7 +134,7 @@ Welcome to your new app.
                     //  1. Is still running - Schedules a contunation that calls this method
                     //  2. Is Cancelled or Is Faulted - sets the appropraite state on _taskManager 
                     // Returns if any of the above is true
-                    if (this.ReturnOnTaskStatus(_step1_Task))
+                    if (this.ReturnOnTaskStatus(_state1_Task))
                         return;
 
                     // We're here because _doSomethingAsync_Task ran synchronously without a yield
@@ -137,7 +145,7 @@ Welcome to your new app.
                 if (_state == 1)
                 {
                     // Handle exception or cancellation task states
-                    if (this.HandleTaskErrorOrCancellation(_step1_Task))
+                    if (this.HandleTaskErrorOrCancellation(_state1_Task))
                         return;
 
                     // The code following the first 'await' to the next await or the end.
@@ -209,7 +217,7 @@ Welcome to your new app.
         private int _state = 0;
 
         // Tasks for each step
-        private Task _step1_Task = Task.CompletedTask;
+        private Task _state1_Task = Task.CompletedTask;
 
         public Task Task => _taskManager.Task;
 
@@ -231,7 +239,7 @@ Welcome to your new app.
                     }
 
                     // Start the await Task
-                    _step1_Task = TaskHelper.PretendToDoSomethingAsync();
+                    _state1_Task = TaskHelper.PretendToDoSomethingAsync();
 
                     // Update state
                     _state = 1;
@@ -241,7 +249,7 @@ Welcome to your new app.
                     //  1. Is still running - Schedules a contunation that calls this method
                     //  2. Is Cancelled or Is Faulted - sets the appropraite state on _taskManager
                     // Returns if any of the above is true
-                    if (this.ReturnOnTaskStatus(_step1_Task))
+                    if (this.ReturnOnTaskStatus(_state1_Task))
                         return;
 
                     // We're here because _doSomethingAsync_Task ran synchronously without a yield
@@ -252,7 +260,7 @@ Welcome to your new app.
                 if (_state == 1)
                 {
                     // Handle exception or cancellation task states
-                    if (this.HandleTaskErrorOrCancellation(_step1_Task))
+                    if (this.HandleTaskErrorOrCancellation(_state1_Task))
                         return;
 
                     // The code following the first 'await' to the next await or the end.
