@@ -32,4 +32,5 @@ We'll look at how this works in practice in the *Async/Await* section.
 
 An important point is that an awaitable completes when it returns a result, not when `IsCompleted` is set. 
 
+When you await a task, [by default] the awaiter will capture the current SynchronizationContext [if there was one] - note the awaiter will be running on a different thread,  When the task completes, it will `Post` the supplied continuation delegate back to the SynchronizationContext, rather than running the delegate on whatever thread the task completed [or scheduling it to run on the ThreadPool].
 
