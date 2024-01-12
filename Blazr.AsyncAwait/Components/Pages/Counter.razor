@@ -1,4 +1,7 @@
 ﻿@page "/counter"
+@inject SingletonService SingletonService
+@inject ScopedService ScopedService
+@inject TransientService TransientService
 
 <PageTitle>Counter</PageTitle>
 
@@ -7,12 +10,45 @@
 <p role="status">Current count: @currentCount</p>
 
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
-
+<div>
+    <button class="btn btn-primary" @onclick="IncrementCount1">Click me</button>
+</div>
 @code {
     private int currentCount = 0;
 
-    private void IncrementCount()
+    private async Task IncrementCount()
     {
         currentCount++;
+        Console.WriteLine($"============================================================");
+        Console.WriteLine($"Thread: {Thread.CurrentThread.ManagedThreadId} - SC: {SynchronizationContext.Current?.GetHashCode()} - {this.GetHashCode()}:{this.GetType().Name} IncrementCount");
+
+        this.SingletonService.LogMessage();
+        this.ScopedService.LogMessage();
+        this.TransientService.LogMessage();
+
+        await this.SingletonService.LogMessageAsync();
+        await this.ScopedService.LogMessageAsync();
+        await this.TransientService.LogMessageAsync();
     }
+
+    private void IncrementCount1()
+    {
+        SynchronizationContext.Current?.Post( async (state) => { await IncrementCounter(); }, null);
+    }
+
+    private async Task IncrementCounter()
+    {
+        currentCount++;
+        Console.WriteLine($"============================================================");
+        Console.WriteLine($"Thread: {Thread.CurrentThread.ManagedThreadId} - SC: {SynchronizationContext.Current?.GetHashCode()} - {this.GetHashCode()}:{this.GetType().Name} IncrementCount");
+
+        this.SingletonService.LogMessage();
+        this.ScopedService.LogMessage();
+        this.TransientService.LogMessage();
+
+        await this.SingletonService.LogMessageAsync(1000);
+        await this.ScopedService.LogMessageAsync(100);
+        await this.TransientService.LogMessageAsync(10);
+    }
+
 }
