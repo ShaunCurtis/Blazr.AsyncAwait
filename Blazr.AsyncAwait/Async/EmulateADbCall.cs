@@ -1,17 +1,12 @@
-﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using static Blazr.AsyncAwait.Async.DbCallEmulatorUtility;
+﻿using System.Runtime.CompilerServices;
 
 namespace Blazr.AsyncAwait.Async;
 
-public class EmulateADbCall : INotifyCompletion
+public struct EmulateADbCall : INotifyCompletion
 {
     private int _millisecs = 10;
     private Timer? _timer = null;
-    private volatile bool _complete;
-
-    public event Action? Completed;
-    public bool IsCompleted => _complete;
+    private bool _complete;
 
     public EmulateADbCall(int millisecs)
     {
@@ -23,17 +18,6 @@ public class EmulateADbCall : INotifyCompletion
         _timer = new Timer(this.Complete, null, _millisecs, -1);
     }
 
-    public void GetResult()
-    {
-        if (!IsCompleted)
-        {
-            var wait = new SpinWait();
-            while (!IsCompleted)
-                wait.SpinOnce();
-        }
-        return;
-    }
-
     private void Complete(object? statusInfo)
     {
         _complete = true;
@@ -42,16 +26,27 @@ public class EmulateADbCall : INotifyCompletion
         _timer = null;
     }
 
+    public bool IsCompleted => _complete;
+
+    public void GetResult()
+    {
+        // Spin if the timer hasn't completed
+        if (!_complete)
+        {
+            var wait = new SpinWait();
+            while (!_complete)
+                wait.SpinOnce();
+        }
+        // Return the result
+        return;
+    }
+
     public void OnCompleted(Action continuation)
     {
-        if (IsCompleted)
-        {
-            continuation();
-            return;
-        }
-
+        // Get the Synchronisation Context if one exista
         var capturedContext = SynchronizationContext.Current;
 
+        // Run the continuation on the Synchronisation Context if it exists
         if (capturedContext != null)
             capturedContext.Post(_ => continuation(), null);
         else
@@ -60,55 +55,8 @@ public class EmulateADbCall : INotifyCompletion
 
     public EmulateADbCall GetAwaiter()
     {
-        return  this;
+        return this;
     }
 }
 
-static class DbCallEmulatorUtility
-{
-
-    public struct Awaiter : INotifyCompletion
-    {
-        private readonly EmulateADbCall _awaitable;
-
-        public Awaiter(EmulateADbCall awaitable)
-            => _awaitable = awaitable;
-
-        public void GetResult()
-        {
-            if (!IsCompleted)
-            {
-                var wait = new SpinWait();
-                while (!IsCompleted)
-                    wait.SpinOnce();
-            }
-            return;
-        }
-
-        public bool IsCompleted => _awaitable.IsCompleted;
-
-        public void OnCompleted(Action continuation)
-        {
-            if (IsCompleted)
-            {
-                continuation();
-                return;
-            }
-            var capturedContext = SynchronizationContext.Current;
-
-            _awaitable.Completed += () =>
-            {
-                if (capturedContext != null)
-                    capturedContext.Post(_ => continuation(), null);
-                else
-                    continuation();
-            };
-        }
-    }
-
-    public static Awaiter GetAwaiter(this EmulateADbCall emulator)
-    {
-        return new Awaiter(emulator);
-    }
-}
 
