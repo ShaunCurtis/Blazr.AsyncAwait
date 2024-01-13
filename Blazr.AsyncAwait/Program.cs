@@ -1,10 +1,15 @@
 using Blazr.AsyncAwait.Components;
+using Blazr.AsyncAwait.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddSingleton<SingletonService>();
+builder.Services.AddScoped<ScopedService>();
+builder.Services.AddTransient<TransientService>();
 
 var app = builder.Build();
 

@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		BlazrSynchronisation.cs = BlazrSynchronisation.cs
 		Delay.md = Delay.md
 		readme.md = readme.md
+		SynchronisationContext.md = SynchronisationContext.md
 		Yield.md = Yield.md
 	EndProjectSection
 EndProject
