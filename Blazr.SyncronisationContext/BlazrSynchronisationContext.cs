@@ -25,11 +25,10 @@ public class BlazrSynchronisationContext : SynchronizationContext
 
     public void Start()
     {
-        var thread = new Thread(() =>
-        {
+        ThreadPool.QueueUserWorkItem((state) => {
+            SynchronizationContext.SetSynchronizationContext(this);
             RunLoop();
         });
-        thread.Start();
     }
 
     public void Stop()
@@ -47,8 +46,9 @@ public class BlazrSynchronisationContext : SynchronizationContext
         {
             Console.WriteLine($"Queue fetching Message on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
             message = _messageQueue.Fetch();
+            //SynchronizationContext.SetSynchronizationContext(this);
             message.Callback?.Invoke(message.State);
-            message.FinishedEvent?.Set();
+
         } while (message.IsRunMessage);
 
         Console.WriteLine($"Loop stopped on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");

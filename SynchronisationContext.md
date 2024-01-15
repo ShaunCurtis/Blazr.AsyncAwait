@@ -22,7 +22,6 @@ The **Synchronisation Context** was created to abstract the developer from the u
 
 So what is a **Synchronisation Context**?
 
-
 The constructor looks like this.  A standalone object: nothing needed to get an instance up and running.
 
 ```csharp
@@ -243,7 +242,7 @@ Thread: 10 - SC: 65049747 - 61547269:TransientService LogMessage
 
 At this point `SingletonService.LogMessageASync` yields and the synchronisation context runs the continuation on a separate thread it has acquired.
 
-The coninuation for the other two services `ScopedService.LogMessageASync` and `TransientService.LogMessageASync` are run on another thread acquired by the synchronisation context.
+The continuation for the other two services `ScopedService.LogMessageASync` and `TransientService.LogMessageASync` are run on another thread acquired by the synchronisation context.
 
 If you run the click event several times, you will see various variations on the async events.  The first sync methods always run on the same thread, but the continuations from the yielding methods may be run on other threads.
 

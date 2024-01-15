@@ -11,15 +11,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Async-Await.md = Async-Await.md
 		Awaitable.md = Awaitable.md
 		BlazrSynchronisation.cs = BlazrSynchronisation.cs
+		Building-A-SynchronisationContext.md = Building-A-SynchronisationContext.md
 		Delay.md = Delay.md
 		readme.md = readme.md
 		SynchronisationContext.md = SynchronisationContext.md
 		Yield.md = Yield.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.SyncronisationContext", "Blazr.SyncronisationContext\Blazr.SyncronisationContext.csproj", "{8F1B3883-8DD5-4B8D-B802-5B515D4B044D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.SyncronisationContext", "Blazr.SyncronisationContext\Blazr.SyncronisationContext.csproj", "{8F1B3883-8DD5-4B8D-B802-5B515D4B044D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.SyncContext.Demo", "Blazr.SyncContext.Demo\Blazr.SyncContext.Demo.csproj", "{CEEA2A2A-0C40-42AE-A310-41A1D19CD811}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.SyncContext.Demo", "Blazr.SyncContext.Demo\Blazr.SyncContext.Demo.csproj", "{CEEA2A2A-0C40-42AE-A310-41A1D19CD811}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
