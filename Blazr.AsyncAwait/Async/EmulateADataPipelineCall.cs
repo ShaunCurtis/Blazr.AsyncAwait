@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using Blazr.SyncronisationContext;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Blazr.AsyncAwait.Async;
@@ -38,13 +39,13 @@ public sealed class EmulateADataPipelineCallState : INotifyCompletion
     public EmulateADataPipelineCallState()
     {
         _stopwatch.Start();
-        Console.WriteLine($"Created at {DateTime.Now.ToLongTimeString()}.");
-        Console.WriteLine($"Delay was: {_stopwatch.ElapsedMilliseconds} milliseconds.");
+        Utilities.WriteToConsole("EmulateADataPipelineCallState created at {DateTime.Now.ToLongTimeString()}");
+        Utilities.WriteToConsole("EmulateADataPipelineCallState Delay was: {_stopwatch.ElapsedMilliseconds} milliseconds");
     }
 
     internal void Complete(object? statusInfo)
     {
-        Console.WriteLine($"Complete called: {_stopwatch.ElapsedMilliseconds} milliseconds.");
+        Utilities.WriteToConsole("EmulateADataPipelineCallState Complete called: {_stopwatch.ElapsedMilliseconds} milliseconds");
         if (!this.IsCompleted)
         {
             this.IsCompleted = true;
@@ -58,7 +59,7 @@ public sealed class EmulateADataPipelineCallState : INotifyCompletion
 
     public void OnCompleted(Action continuation)
     {
-        Console.WriteLine($"OnCompleted called: {_stopwatch.ElapsedMilliseconds} milliseconds.");
+        Utilities.WriteToConsole("EmulateADataPipelineCallState OnCompleted called: {_stopwatch.ElapsedMilliseconds} milliseconds");
         if (IsCompleted)
         {
             continuation();

@@ -1,7 +1,6 @@
 # Async/Await
 
 Async/Await is fundamental building material in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
-
 The downside is it's success: programmers just use it without the need to understand what's really going on.  Good in most instacnes, but when it doesn't work as advertised, it's very hard ro understand why not. 
 
 There are several very good articles available on the subject.  The problem is that they assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortal programmers.
