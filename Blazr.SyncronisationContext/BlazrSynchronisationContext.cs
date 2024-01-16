@@ -6,11 +6,13 @@ public class BlazrSynchronisationContext : SynchronizationContext
 
     public override void Post(SendOrPostCallback callback, object? state)
     {
+        Utilities.WriteToConsole("SyncContext Post");
         _messageQueue.Post(new WorkMessage(callback, state));
     }
 
     public override void Send(SendOrPostCallback callback, object? state)
     {
+        Utilities.WriteToConsole("SyncContext Send");
         var resetEvent = new ManualResetEventSlim(false);
         try
         {
@@ -26,7 +28,7 @@ public class BlazrSynchronisationContext : SynchronizationContext
     public void Start()
     {
         ThreadPool.QueueUserWorkItem((state) => {
-            SynchronizationContext.SetSynchronizationContext(this);
+            //SynchronizationContext.SetSynchronizationContext(this);
             RunLoop();
         });
     }
@@ -38,19 +40,18 @@ public class BlazrSynchronisationContext : SynchronizationContext
 
     private void RunLoop()
     {
-        Console.WriteLine($"Message Loop running on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
-
+        Utilities.WriteToConsole("Message Loop Running");
         WorkMessage message = WorkMessage.StopMessage;
 
         do
         {
-            Console.WriteLine($"Queue fetching Message on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
+            Utilities.WriteToConsole("Message Loop Fetch");
             message = _messageQueue.Fetch();
             //SynchronizationContext.SetSynchronizationContext(this);
             message.Callback?.Invoke(message.State);
 
         } while (message.IsRunMessage);
 
-        Console.WriteLine($"Loop stopped on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
+        Utilities.WriteToConsole("Message Loop Stopped");
     }
 }

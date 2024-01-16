@@ -1,6 +1,25 @@
 # Building a Synchronisation Context
 
-In this article I'll demonstrate how to build a simples synchronisation context for a console application.
+In this article I'll demonstrate how to build a simplistic synchronisation context for a console application.
+
+## What is a Synchronisation Context?
+
+UI code needs to be run in the same execution context that owns the UI objects.  
+
+Consider this piece of code:
+
+```csharp
+async Task UIEvent()
+{
+await GetSomeDataFromAnAPI();
+UpdateGrid();
+}
+```
+The UI handler needs somewhere to post this code, track the awaiter [running on a different thread] while the HttpClient gets the data, and ensure that the continuation is run on the UI context.
+
+This is what a synchronisation context provides in conjunction with various Task Parallel Library objects [such as `Task`].
+
+## Coding the Objects
 
 First a message object:
 
@@ -25,6 +44,50 @@ public readonly record struct WorkMessage
     public static WorkMessage StopMessage => new WorkMessage(null);
 
     public bool IsRunMessage => this.Callback is not null; 
+}
+```
+
+And some utilities:
+
+```csharp
+public static class Utilities
+{
+    public static void WriteToConsole(string startMessage)
+    {
+        string sc = SynchronizationContext.Current is null 
+            ? " -- Not Set -- " 
+            : SynchronizationContext.Current.GetHashCode().ToString();
+ 
+        Console.WriteLine($"{startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
+    }
+
+    public static async void DoWorkVoidAsync(object? state)
+    {
+        WriteToConsole("DoWorkAsync started ");
+        await Task.Delay(1000);
+        WriteToConsole("DoWorkAsync continuation");
+    }
+
+    public static async Task DoWorkTaskAsync()
+    {
+        WriteToConsole("Task DoWorkAsync started");
+        await Task.Delay(1000);
+        WriteToConsole("Task DoWorkAsync continuation");
+    }
+
+    public static async Task DoWorkAwaitAsync()
+    {
+        WriteToConsole("Await DoWorkAsync started");
+        await Task.Delay(1000);
+        WriteToConsole("Await DoWorkAsync continuation");
+    }
+
+    public static async void DoWorkThreadpoolAsync(object? state)
+    {
+        WriteToConsole("Threadpool DoWorkAsync started");
+        await Task.Delay(3000);
+        WriteToConsole("Threadpool DoWorkAsync continuation");
+    }
 }
 ```
 
@@ -130,4 +193,98 @@ private void RunLoop()
     {
         _messageQueue.Post(WorkMessage.StopMessage);
     }
+```
+
+### Posting
+
+Code `Main`.
+
+```csharp
+var sc = new BlazrSynchronisationContext();
+//SynchronizationContext.SetSynchronizationContext(sc);
+
+WriteToConsole("Application started");
+
+sc.Start();
+
+sc.Post(DoWorkAsync, null);
+
+Console.ReadLine();
+
+sc.Post(DoWorkAsync, null);
+
+Console.ReadLine();
+
+async void DoWorkAsync(object? state)
+{
+    WriteToConsole("DoWorkAsync started ");
+    await Task.Delay(1000);
+    WriteToConsole("DoWorkAsync continuation");
+}
+
+void WriteToConsole(string startMessage)
+    => Console.WriteLine($"{startMessage} {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()}");
+```
+
+And when we run it, we see `main` running on thread 1 and the Message Loop running on thread 7.  All the work we post to the SC runs on the Message Loop thread.   
+
+```text
+Application started 1 - SC :
+Message Loop running on Thread: 7 - SC : 12547953
+Queue fetching Message on Thread: 7 - SC : 12547953
+DoWorkAsync started  7 - SC : 12547953
+Queue fetching Message on Thread: 7 - SC : 12547953
+DoWorkAsync continuation 7 - SC : 12547953
+Queue fetching Message on Thread: 7 - SC : 12547953
+
+DoWorkAsync started  7 - SC : 12547953
+Queue fetching Message on Thread: 7 - SC : 12547953
+DoWorkAsync continuation 7 - SC : 12547953
+Queue fetching Message on Thread: 7 - SC : 12547953
+```
+
+```csharp
+var sc = new BlazrSynchronisationContext();
+
+WriteToConsole("Application started");
+
+sc.Start();
+
+var task = Task.Run(async () =>
+{
+    SynchronizationContext.SetSynchronizationContext(sc);
+    await DoWork1Async();
+});
+
+Console.ReadLine();
+sc.Post(DoWorkAsync, null);
+Console.ReadLine();
+
+void WriteToConsole(string startMessage)
+    => Console.WriteLine($"{startMessage} {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()}");
+
+async void DoWorkAsync(object? state)
+{
+    WriteToConsole("DoWorkAsync started ");
+    await Task.Delay(1000);
+    WriteToConsole("DoWorkAsync continuation");
+}
+
+async Task DoWork1Async()
+{
+    WriteToConsole("Await DoWorkAsync started");
+    await Task.Delay(1000);
+    WriteToConsole("Await DoWorkAsync continuation");
+}
+```
+
+The result is `DoWorkAsync` starts on a different thread, but as that thread has a synchonisation context set, the continuation is posted back to the synchonisation context where it is run.
+
+```csharp
+Application started 1 - SC :
+Message Loop running on Thread: 10 - SC : 45653674
+Queue fetching Message on Thread: 10 - SC : 45653674
+Await DoWorkAsync started 9 - SC : 45653674
+Await DoWorkAsync continuation 10 - SC : 45653674
+Queue fetching Message on Thread: 10 - SC : 45653674
 ```
