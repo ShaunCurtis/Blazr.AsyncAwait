@@ -1,9 +1,10 @@
 # Async/Await
 
 Async/Await is fundamental building material in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
-The downside is it's success: programmers just use it without the need to understand what's really going on.  Good in most instacnes, but when it doesn't work as advertised, it's very hard ro understand why not. 
 
-There are several very good articles available on the subject.  The problem is that they assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortal programmers.
+The downside is it's success: programmers just use it without the need to understand what's really going on.  Good almost all of the time, but when it doesn't work as advertised, it's very hard to understand why not. 
+
+There are several very good articles available on the subject.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
 
 Consider this simple Blazor `Home` page:
 
@@ -64,25 +65,25 @@ public static class TaskHelper
 
 ### The Async State Machine 
 
-When those three lines are compiled they are first transposed into lower level C# code that implements a state machine.
+When those three lines are compiled *Task Parallel Library* code generators come into action.  Your high level code is recompiled into low level TPL primitive code that builds a TPL state machine and refactors the caller to use that state machine.
 
 1. `async` is a modifier and `await` is an operator.
 
-1. The state machine is implemented as a class within the parent class - in this case `Home`.  This gives it access to the private methods, properties and variables of `Home`. 
+1. The state machine is implemented as an object within the parent class - in this case `Home`.  This gives it access to the private methods, properties and variables of `Home`.
 
-2. Each code block between `awaits` is a state.  Think of applying a `split` on `await`: one `await` will produce two states.
+2. Each code block between `awaits` is a state.  Think of applying a `split` on `await`: *n* `awaits` produce *n+1* states.
 
 1. The constructor requires a reference to the parent - `_parent`.
  
-1. It uses a `TaskCompletionSource` to control the task provided by the state machine.
+1. It uses a Task primitive to control the task provided by the state machine.  We'll use  `TaskCompletionSource` in our example.
 
-1. There are global `Task` variables for all the async methods called.  In this case `_task1_Task` to assign `DoSomethingAsync` to when we call it.
+1. There are global `Task` variables for each async method called.  In this case `_task1_Task` to assign `DoSomethingAsync` to when we call it.
 
-1. The initial `_state` is set to `0`.
+1. The initial `_state` is `0`.
  
 1. The state machine is run by calling `Execute`.
 
-Here's the skeleton for out three liner.
+Here's the skeleton for our three liner.
 
 ```csharp
 class Clicked_StateMachine
@@ -106,7 +107,7 @@ class Clicked_StateMachine
 }
 ```
 
-The `Execute` detail.  Execution is wrapped in a `try` so we can pass any exception to the caller through the `TaskCompletionSource`.
+The `Execute` detail.  Execution is wrapped in a `try` so we can pass any exceptions to the caller through the `TaskCompletionSource`.
 
 ```csharp
 public void Execute()

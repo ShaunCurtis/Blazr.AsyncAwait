@@ -7,9 +7,9 @@ Throughout these discussions I use the term *Threading Context* to describe the 
 
 Blazor adds extra functionality to manage posting Renderer activity, such as servicing the Render queue and UI generated events.
 
-The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` which returns an object that implements *IsCompleted/OnCompleted/GetResult* can be awaited by the threading context. 
+The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` can be awaited by the threading context. 
 
-The core functionality of the returned object is:
+`GetAwaiter` must implement this functionality:
 
 ```csharp
 public struct MyAwaiter : INotifyCompletion
@@ -20,7 +20,7 @@ public struct MyAwaiter : INotifyCompletion
     public void GetResult();
 }
 ```
-`Task` implements these three methods and a `GetAwaiter` that returns itself.
+`Task` implements these three methods and it's `GetAwaiter` returns itself.
 
 When an object yields the threading context calls `GetAwaiter` to get an object that has: 
 
@@ -30,7 +30,22 @@ When an object yields the threading context calls `GetAwaiter` to get an object 
 
 We'll look at how this works in practice in the *Async/Await* section.
 
-An important point is that an awaitable completes when it returns a result, not when `IsCompleted` is set. 
+Implementing a customer awaiter is complex and beyond the scope of this article.
 
-When you await a task, [by default] the awaiter will capture the current SynchronizationContext [if there was one] - note the awaiter will be running on a different thread,  When the task completes, it will `Post` the supplied continuation delegate back to the SynchronizationContext, rather than running the delegate on whatever thread the task completed [or scheduling it to run on the ThreadPool].
+### Some Key Points
 
+1. A call to a method returning a Task returns a `Task<T>`, not `T`.  The way you write the code:
+
+```csharp
+var result = await DoSomeAsyncWork();
+```
+
+suggests result is `T`.  The Dev environment even tells you so.  That's just syntactic sugar.  Behind the scenes the code is calling `GetResult()` on the completed `Task<T>`.
+
+Miss out the `await` and `result` with now be a `Task<T>.
+  
+2. An awaiter needs to know where to run it's continuation. It does so by capturing the current `SynchronizationContext` [if there was one].  If `ConfigureAwait` is true [the default], it posts the continuation back to the captured `SynchronizationContext`. 
+
+3. A Task method that actually yields control will be running on a separate thread.  It's waiting on a result so blocks that thread until it can complete. 
+
+4. It should be clear why calling `GetResult` blocks the current thread and causes deadlocks.
