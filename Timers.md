@@ -4,52 +4,63 @@ Timers are one of those *Hazy* topics.  Most programmers know how to use them an
 
 ## One Timer to Rule them All
 
-There's a class called `TimerQueue`.  It implements the *Singleton* pattern : one instance exists in the AppDomain and manages all the application timers. 
+Behind the scenes there's only one running timer object.  `TimerQueue` implements the *Singleton* pattern : one instance in the AppDomain.  It manages all the application timers and schedules the callbacks when timers expire.
 
-There are two sorts of timers:
+When you create a timer, you actually queue a timer object to `TimerQueue`. 
 
-1. Operational Timeouts.  These are system timers created and destroyed frequently and only fire if somnethig goes wrong.
+Timers are creates for two purposes:
 
-2. Scheduled Background Tasks.  These are designed to fire.  They include all the timers we create and consume in pour code.
+1. Operational Timeouts.  These are system timers created and destroyed frequently. They only fire if something goes wrong.
 
-`TimerQueue` maintains a list of active timers.
+2. Scheduled Background Tasks.  These are designed to fire.  They include all the timers we create and consume in our code.
+
+`TimerQueue` is set up to run on it's own thread.
+
+```csharp
+new Thread(TimerQueue.Create().Run());
+```
 
 ### The Timer Loop
 
 `TimerQueue` uses a single native timer provided by the Virtual Machine.
 
-The basic operation can be summarised as the following pseudo-code:
+The basic operation can be summarised:
 
 ```csharp
-void Loop()
+void Resume()
 {
     FireAllExpiredTimers();
-    var nextTimeSpan = UnexpiredTimers.ShortestTimeSpanToExpiration();
-    AppDomainTimerSafeHandle.Callback(Loop, nextTimeSpan);
+    nextTimeSpan = UnexpiredTimers.ShortestTimeSpanToExpiration();
+    NativeTimer.ScheduleCallback(Resume, nextTimeSpan);
 }
 ```
- 
 
-```text
-//
-    // TimerQueue maintains a list of active timers in this AppDomain.  We use a single native timer, supplied by the VM,
-    // to schedule all managed timers in the AppDomain.
-    //
-    // Perf assumptions:  We assume that timers are created and destroyed frequently, but rarely actually fire.
-    // There are roughly two types of timer:
-    //
-    //  - timeouts for operations.  These are created and destroyed very frequently, but almost never fire, because
-    //    the whole point is that the timer only fires if something has gone wrong.
-    //
-    //  - scheduled background tasks.  These typically do fire, but they usually have quite long durations.
-    //    So the impact of spending a few extra cycles to fire these is negligible.
-    //
-    // Because of this, we want to choose a data structure with very fast insert and delete times, but we can live
-    // with linear traversal times when firing timers.
-    //
-    // The data structure we've chosen is an unordered doubly-linked list of active timers.  This gives O(1) insertion
-    // and removal, and O(N) traversal when finding expired timers.
-    //
-    // Note that all instance methods of this class require that the caller hold a lock on TimerQueue.Instance.
-    //
+The native timer triggers `Resume`.  It enumerates the currently registered timers and:
+
+1. Fires the callbacks on any that have expired.  It fires the first on the current thread and any subsequent ones on a threadpool thread.  
+1. Keeps track of the minimum time to expire period for all the unexpired timers.
+
+Once complete it schedules a callback from the Native timer for the minumim period.  Note that the resolution of `nextTimeSpan` will be based on the resolution of the system clock: approx 15 ms on a Windows Server.   
+
+Adding a new timer:
+
+```csharp
+void AddTimer(Timer timer)
+{
+   AddTimerToList(timer);
+   ResheduleNativeTimerIfRequired(Resume, nextTimeSpan);
+}
 ```
+
+This adds `timer` to the queue and reschedules the native timer callback if the new timer's timespan is shorter than the current scheduled callback.
+
+## Takeaways
+
+1. When you "run" a timer there's no black magic.  You add a new timer to the queue and carry on to the next task: fire and forget.  There's nothing happening "in the background" on your current execution thread.  The tracking, management and callbacks are managed by `TimerQueue` running on another thread.
+
+1. You should `Dispose` a timer to remove it from the queue.
+
+1. The callback (or event in a System.Timers.Timer object) runs in a threadpool context, not the context of the owning object.  You must switch to the `SynchronisationContext` to run any UI based code.
+
+
+

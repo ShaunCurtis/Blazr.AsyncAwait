@@ -41,7 +41,7 @@ Welcome to your new app.
 
 Run this and you will see the UI stays responsive, the first message is logged and displayed before the blocking code runs and finally displays the second message.
 
-We can build out own version of `Yield` like this.
+We can build our own version of `Yield` like this.
 
 Create a `TaskCompletionSource`. We'll pass the `Task` associated with it to the caller. 
 
@@ -78,13 +78,13 @@ The continuation is queued on the current context behind the current execution b
 
 To understand the wider context, there are some points of knowledge:
 
-1. The Component almost certainly inherits from `ComponentBase` and implements a `IHandleEvent.HandleEventAsync` UI event handler the schedules a render event on the first yield of thw actual handler and after the completion of the handler.
+1. The Component almost certainly inherits from `ComponentBase` and implements a `IHandleEvent.HandleEventAsync` UI event handler the schedules a render event on the first yield of the actual handler and after the completion of the handler.
 
 2. Calling `await` in itself doesn't cause a yield.  `await TaskHelper.PretendToDoSomethingAsync` may call a Task based method, but `PretendToDoSomethingAsync` is a block of synchronous code. The continuation code block is executed directly after the call to `PretendToDoSomethingAsync` completes.  There's no continuation created and posted to the current thread.
 
 1. The default continuation behaviour is to schedule the continuation on the current thread.  In the current context, everything runs on the SC.
  
-1. The Synchronisation Context prioritizes posted code over UI generated code.  As almost all activity is the result of UI events, it attempts to complete what it's already started before reacting to new UI event. 
+1. The Synchronisation Context prioritizes posted code over UI generated code.  Almost all activity is the result of UI events, so it attempts to complete what it's already started before reacting to new UI event. 
 
 After posting the completion the following is queued on the SC:
 
