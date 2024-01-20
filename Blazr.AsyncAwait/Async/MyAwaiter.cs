@@ -5,82 +5,93 @@ namespace Blazr.AsyncAwait.Async;
 
 public class MyAwaitable
 {
-    private volatile bool completed;
-    private volatile int result;
-    private Action? continuation;
+    private volatile bool _completed;
+    private volatile int _result;
+    private Action? _continuation;
     private Timer? _timer;
-    public bool IsCompleted => completed;
+    private SynchronizationContext? _capturedContext;
+    private bool _useContext;
+    public bool IsCompleted => _completed;
 
     public int Result => RunToCompletionAndGetResult();
 
     private MyAwaitable()
     {
+        _capturedContext = SynchronizationContext.Current;
     }
 
     private void TimerExpired(object? state)
     {
-        Utilities.WriteToConsole("Timer Expired");
-        if (completed)
+        Utilities.LogToConsole("Timer Expired");
+        if (_completed)
             return;
 
-        this.result = 1;
-        completed = true;
-    }
-
-    public void Finish(int result)
-    {
-        if (completed)
-            return;
-        completed = true;
-        this.result = result;
+        _result = 1;
+        _completed = true;
     }
 
     public MyAwaiter GetAwaiter() => ConfigureAwait(true);
 
-    public MyAwaiter ConfigureAwait(bool captureContext)
-        => new MyAwaiter(this, captureContext);
+    public MyAwaiter ConfigureAwait(bool useContext)
+    {
+        _useContext = useContext;   
+        return new MyAwaiter(this);
+    }
 
-    internal void ScheduleContinuation(Action action) => continuation += action;
+    internal void SetContinuation(Action continuation)
+        => _continuation = continuation;
+ 
+    internal void ScheduleContinuation()
+    {
+        if (!_completed)
+            return;
+
+        if (_continuation is not null)
+        {
+            if (_useContext && _capturedContext != null)
+                _capturedContext.Post(_ => _continuation(), null);
+            else
+                _continuation();
+        }
+    }
 
     internal int RunToCompletionAndGetResult()
     {
         var wait = new SpinWait();
-        while (!completed)
+        while (!_completed)
             wait.SpinOnce();
-        return result;
+        return _result;
     }
 
     public static MyAwaiter Idle(int period)
     {
         var sc = SynchronizationContext.Current;
         MyAwaitable awaitable = new MyAwaitable();
-        Task.Run(() =>
+        awaitable._timer = new(awaitable.TimerExpired, null, period, Timeout.Infinite);
+
+        ThreadPool.QueueUserWorkItem((state) =>
         {
-            Utilities.WriteToConsole("MyAwaiter instance started");
             SynchronizationContext.SetSynchronizationContext(sc);
-            var myAwaiter = new MyAwaitable();
-            awaitable = myAwaiter;
-            myAwaiter._timer = new(myAwaiter.TimerExpired, null, period, Timeout.Infinite);
+            Utilities.LogToConsole("MyAwaitable instance waiting on idle period.");
+
             var wait = new SpinWait();
-            while (!myAwaiter.completed)
+            while (!awaitable._completed)
                 wait.SpinOnce();
-        }
-        );
+
+            awaitable.ScheduleContinuation();
+        });
+
         return awaitable.GetAwaiter();
     }
 }
 
-public class MyAwaiter : INotifyCompletion
+public readonly struct MyAwaiter : INotifyCompletion
 {
     private readonly MyAwaitable awaitable;
-    private readonly bool captureContext;
-    SynchronizationContext? _capturedContext;
 
-    public MyAwaiter(MyAwaitable awaitable, bool captureContext)
+    public MyAwaiter(MyAwaitable awaitable)
     {
         this.awaitable = awaitable;
-        this.captureContext = captureContext;
-        _capturedContext = SynchronizationContext.Current;
     }
 
     public MyAwaiter GetAwaiter() => this;
@@ -91,13 +102,7 @@ public class MyAwaiter : INotifyCompletion
 
     public void OnCompleted(Action continuation)
     {
-        Utilities.WriteToConsole("OnCompleted Called");
-        awaitable.ScheduleContinuation(() =>
-        {
-            if (captureContext && _capturedContext != null)
-                _capturedContext.Post(_ => continuation(), null);
-            else
-                continuation();
-        });
+        awaitable.SetContinuation(continuation);
+        awaitable.ScheduleContinuation();
     }
 }

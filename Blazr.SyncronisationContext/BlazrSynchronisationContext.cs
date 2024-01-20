@@ -6,13 +6,13 @@ public class BlazrSynchronisationContext : SynchronizationContext
 
     public override void Post(SendOrPostCallback callback, object? state)
     {
-        Utilities.WriteToConsole("SyncContext Post");
+        Utilities.LogToConsole("SyncContext Post");
         _messageQueue.Post(new WorkMessage(callback, state));
     }
 
     public override void Send(SendOrPostCallback callback, object? state)
     {
-        Utilities.WriteToConsole("SyncContext Send");
+        Utilities.LogToConsole("SyncContext Send");
         var resetEvent = new ManualResetEventSlim(false);
         try
         {
@@ -40,18 +40,18 @@ public class BlazrSynchronisationContext : SynchronizationContext
 
     private void RunLoop()
     {
-        Utilities.WriteToConsole("Message Loop Running");
+        Utilities.LogToConsole("Message Loop Running");
         WorkMessage message = WorkMessage.StopMessage;
 
         do
         {
-            Utilities.WriteToConsole("Message Loop Fetch");
+            //Utilities.LogToConsole("Message Loop Fetch");
             message = _messageQueue.Fetch();
-            //SynchronizationContext.SetSynchronizationContext(this);
+            //Utilities.LogToConsole("Message Loop Executing");
             message.Callback?.Invoke(message.State);
 
         } while (message.IsRunMessage);
 
-        Utilities.WriteToConsole("Message Loop Stopped");
+        Utilities.LogToConsole("Message Loop Stopped");
     }
 }
