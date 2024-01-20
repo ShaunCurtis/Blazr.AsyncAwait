@@ -27,7 +27,6 @@ public class MyAwaiter : INotifyCompletion
         this.awaitable = awaitable;
         if (IsCompleted)
             SetResult();
-
     }
 
     public bool IsCompleted => awaitable.IsFinished;

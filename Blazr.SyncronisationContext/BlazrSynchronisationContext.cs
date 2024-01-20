@@ -28,7 +28,7 @@ public class BlazrSynchronisationContext : SynchronizationContext
     public void Start()
     {
         ThreadPool.QueueUserWorkItem((state) => {
-            //SynchronizationContext.SetSynchronizationContext(this);
+            SynchronizationContext.SetSynchronizationContext(this);
             RunLoop();
         });
     }
