@@ -17,28 +17,33 @@ sc.Start();
 
 sc.Post(DoWorkAsyncVoid, null);
 
-sc.Post((state) =>
-{
-    Utilities.WriteToConsole("Application running after DoWorkAsyn Called");
-}, 
-null);
+//sc.Post((state) =>
+//{
+//    Utilities.WriteToConsole("Application running after DoWorkAsyn Called");
+//},
+//null);
 
-//Utilities.WriteToConsole("Application running after DoWorkAsyn Called");
+Utilities.WriteToConsole("Application running after DoWorkAsyn Called");
 
 Console.ReadLine();
 
 async Task DoWorkAsync()
 {
     Utilities.WriteToConsole("DoWorkAsync started");
-    var testAwaiter = new TestAwaiter();
-    await testAwaiter.IdleAsync(2000);
+    //await new MyAwaitable(2000);
+    //var testAwaiter = new TestAwaiter();
+    //await testAwaiter.IdleAsync(2000);
     Utilities.WriteToConsole("DoWorkAsync completed");
 }
 
 async void DoWorkAsyncVoid(object? state)
 {
     Utilities.WriteToConsole("DoWorkAsync started");
-    var testAwaiter = new TestAwaiter();
-    await testAwaiter.IdleAsync(10000);
+    //var awaitable = new MyAwaitable(2000);
+    //var x = await awaitable;
+    var awaiter = MyAwaitable.Idle(3000);
+    await awaiter;
+    //var testAwaiter = new TestAwaiter();
+    //await testAwaiter.IdleAsync(2000);
     Utilities.WriteToConsole("DoWorkAsync completed");
 }

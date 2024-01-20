@@ -16,6 +16,7 @@ public class TestAwaiter : INotifyCompletion
 
     public TestAwaiter IdleAsync(int period)
     {
+        _capturedContext?.OperationStarted();
         if (_timer is null)
             _timer = new(TimerExpired, null, period, Timeout.Infinite);
 
@@ -26,6 +27,7 @@ public class TestAwaiter : INotifyCompletion
     {
         _isFinished = true;
         _result = new Random().Next();
+        _capturedContext?.OperationCompleted();
     }
 
     public TestAwaiter GetAwaiter() => this;

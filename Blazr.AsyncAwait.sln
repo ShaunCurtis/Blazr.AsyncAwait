@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.Async.Demo", "Blazr.A
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.TestAwaiter.Demo", "Blazr.TestAwaiter\Blazr.TestAwaiter.Demo.csproj", "{C4303918-30A1-49AF-A8C5-3636F39E233A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.MyAwaitable", "Blazr.MyAwaitable\Blazr.MyAwaitable.csproj", "{5ED28BF4-97BD-4BE1-8570-368FDA59F316}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -53,6 +55,10 @@ Global
 		{C4303918-30A1-49AF-A8C5-3636F39E233A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C4303918-30A1-49AF-A8C5-3636F39E233A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C4303918-30A1-49AF-A8C5-3636F39E233A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5ED28BF4-97BD-4BE1-8570-368FDA59F316}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5ED28BF4-97BD-4BE1-8570-368FDA59F316}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5ED28BF4-97BD-4BE1-8570-368FDA59F316}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5ED28BF4-97BD-4BE1-8570-368FDA59F316}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
