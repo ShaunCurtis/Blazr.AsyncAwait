@@ -4,7 +4,7 @@ In this article I'll demonstrate how to build a simplistic synchronisation conte
 
 ## What is a Synchronisation Context?
 
-Applications with UI have a severe problwm with Threading.  Their classes are rarely thread safe, and don't support mechanisms such as `lock` to make them so.  The solution to the problem is to run all UI code on the same thread.  Code executes sequentually: no need to worry about thread safety.
+Applications with UI have a severe problwm with threading.  Their classes are rarely thread safe, and don't support mechanisms such as `lock` to make them so.  The solution is to run all UI code on the same thread.  Code executes sequentually: no need to worry about thread safety.
 
 This is what a synchronisation context provides. Older UI frameworks have solved this problem in different ways.  The `SynchronisationContext` abstracts us and the TPL from this detail.  Different implementations for different frameworks.
 
@@ -23,7 +23,9 @@ The UI handler needs somewhere to post this code that will track the awaiter whi
 
 ## Coding the Objects
 
-First a message object:
+### WorkMessage
+
+First a simple message object:
 
 ```csharp
 public readonly record struct WorkMessage
@@ -49,6 +51,10 @@ public readonly record struct WorkMessage
 }
 ```
 
+`StopMessage` contains a null `SendOrPostCallback` property, but you can only set it to null by getting the static property `StopMessage`.
+
+### Utilities
+
 And some utilities:
 
 ```csharp
@@ -61,6 +67,15 @@ public static class Utilities
             : SynchronizationContext.Current.GetHashCode().ToString();
  
         Console.WriteLine($"{startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
+    }
+
+    public static void LogToConsole(string startMessage)
+    {
+        string sc = SynchronizationContext.Current is null
+            ? " -- Not Set -- "
+            : SynchronizationContext.Current.GetHashCode().ToString();
+
+        Console.WriteLine($"     ===> {startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
     }
 
     public static async void DoWorkVoidAsync(object? state)
@@ -84,7 +99,7 @@ public static class Utilities
         WriteToConsole("Await DoWorkAsync continuation");
     }
 
-    public static async void DoWorkThreadpoolAsync(object? state)
+    public static async Task DoWorkThreadpoolAsync(object? state)
     {
         WriteToConsole("Threadpool DoWorkAsync started");
         await Task.Delay(3000);
@@ -93,9 +108,9 @@ public static class Utilities
 }
 ```
 
-The `StopMessage` contains a null `SendOrPostCallback` property, but you can only set it to null by getting the static property `StopMessage`.
+### MessageQueue
 
-Next we need a message queue.  This uses a semaphore to control access to the queue.  The initial value of the semaphore is 0.  So the call to `_semaphore.Wait();` will block until a message is posted and sets to semaphore count to 1.  `_semaphore.Wait();` will be released to continue and de-queue a message.  When `_semaphore.Wait();` runs it decrements to semaphore count to 0. 
+Next we need a message queue.  This uses a semaphore to control access to the queue.  The initial value of the semaphore is 0.  So the call to `_semaphore.Wait();` will block until a message is posted and sets to semaphore count to 1.  `_semaphore.Wait();` will be released to continue and de-queue a message.  Note when `_semaphore.Wait();` runs it decrements the semaphore count by 1, so sets it to 0. 
 
 ```csharp
 public class MessageQueue
@@ -119,6 +134,8 @@ public class MessageQueue
     }
 }
 ```
+
+### BlazrSynchronisationContext
 
 And our synchronisation context template:
 
@@ -151,45 +168,49 @@ public void Start()
 
 private void RunLoop()
 {
-    Console.WriteLine($"Message Loop running on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
-
+    Utilities.LogToConsole("Message Loop Running");
     WorkMessage message = WorkMessage.StopMessage;
 
     do
     {
-        Console.WriteLine($"Queue fetching Message on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
+        //Utilities.LogToConsole("Message Loop Fetch");
         message = _messageQueue.Fetch();
+        //Utilities.LogToConsole("Message Loop Executing");
         message.Callback?.Invoke(message.State);
 
     } while (message.IsRunMessage);
 
-    Console.WriteLine($"Loop stopped on Thread: {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()} ");
+    Utilities.LogToConsole("Message Loop Stopped");
 }
 ```
 
 `Post` and `Send` create `WorkMessage` instances and post them to the messge queue.  `Send` adds a `ManualResetEventSlim` which is used to block until the action completes.
 
 ```csharp
-    public override void Post(SendOrPostCallback callback, object? state)
-    {
-        _messageQueue.Post(new WorkMessage(callback, state));
-    }
+public override void Post(SendOrPostCallback callback, object? state)
+{
+    //Utilities.LogToConsole("SyncContext Post");
+    _messageQueue.Post(new WorkMessage(callback, state));
+}
 
-    public override void Send(SendOrPostCallback callback, object? state)
+public override void Send(SendOrPostCallback callback, object? state)
+{
+    //Utilities.LogToConsole("SyncContext Send");
+    var resetEvent = new ManualResetEventSlim(false);
+    try
     {
-        var resetEvent = new ManualResetEventSlim(false);
-        try
-        {
-            _messageQueue.Post(new WorkMessage(callback, state, resetEvent));
-            resetEvent.Wait();
-        }
-        finally
-        {
-            resetEvent.Dispose();
-        }
+        _messageQueue.Post(new WorkMessage(callback, state, resetEvent));
+        resetEvent.Wait();
     }
+    finally
+    {
+        resetEvent.Dispose();
+    }
+}
 ```
+
 `Stop` posts a StopMmessage to the queue.
+
 ```
     public void Stop()
     {
@@ -197,96 +218,83 @@ private void RunLoop()
     }
 ```
 
-### Posting
+### Demo
 
 Code `Main`.
 
 ```csharp
-var sc = new BlazrSynchronisationContext();
-//SynchronizationContext.SetSynchronizationContext(sc);
-
-WriteToConsole("Application started");
-
+BlazrSynchronisationContext sc = new BlazrSynchronisationContext();
 sc.Start();
 
-sc.Post(DoWorkAsync, null);
+PostToUI("Application started.");
 
 Console.ReadLine();
 
-sc.Post(DoWorkAsync, null);
+PostToUI("Application => Post Started.");
+
+sc.Post(Utilities.DoWorkVoidAsync, null);
+
+PostToUI("Application => Post After.");
 
 Console.ReadLine();
 
-async void DoWorkAsync(object? state)
+PostToUI("Application => ThreadPool Started.");
+
+ThreadPool.QueueUserWorkItem(async (state) =>
 {
-    WriteToConsole("DoWorkAsync started ");
-    await Task.Delay(1000);
-    WriteToConsole("DoWorkAsync continuation");
-}
+    SynchronizationContext.SetSynchronizationContext(sc);
+    await Utilities.DoWorkThreadpoolAsync(null);
+});
 
-void WriteToConsole(string startMessage)
-    => Console.WriteLine($"{startMessage} {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()}");
-```
+PostToUI("Application => ThreatPool After.");
 
-And when we run it, we see `main` running on thread 1 and the Message Loop running on thread 7.  All the work we post to the SC runs on the Message Loop thread.   
+Console.ReadLine();
 
-```text
-Application started 1 - SC :
-Message Loop running on Thread: 7 - SC : 12547953
-Queue fetching Message on Thread: 7 - SC : 12547953
-DoWorkAsync started  7 - SC : 12547953
-Queue fetching Message on Thread: 7 - SC : 12547953
-DoWorkAsync continuation 7 - SC : 12547953
-Queue fetching Message on Thread: 7 - SC : 12547953
-
-DoWorkAsync started  7 - SC : 12547953
-Queue fetching Message on Thread: 7 - SC : 12547953
-DoWorkAsync continuation 7 - SC : 12547953
-Queue fetching Message on Thread: 7 - SC : 12547953
-```
-
-```csharp
-var sc = new BlazrSynchronisationContext();
-
-WriteToConsole("Application started");
-
-sc.Start();
+PostToUI("Application => TaskRun Started.");
 
 var task = Task.Run(async () =>
 {
     SynchronizationContext.SetSynchronizationContext(sc);
-    await DoWork1Async();
+    await Utilities.DoWorkTaskAsync();
 });
 
+PostToUI("Application => TaskRun After.");
+
 Console.ReadLine();
-sc.Post(DoWorkAsync, null);
-Console.ReadLine();
 
-void WriteToConsole(string startMessage)
-    => Console.WriteLine($"{startMessage} {Thread.CurrentThread.ManagedThreadId} - SC : {SynchronizationContext.Current?.GetHashCode()}");
 
-async void DoWorkAsync(object? state)
+void PostToUI(string message)
 {
-    WriteToConsole("DoWorkAsync started ");
-    await Task.Delay(1000);
-    WriteToConsole("DoWorkAsync continuation");
-}
-
-async Task DoWork1Async()
-{
-    WriteToConsole("Await DoWorkAsync started");
-    await Task.Delay(1000);
-    WriteToConsole("Await DoWorkAsync continuation");
+    sc.Post((state) =>
+    {
+        Utilities.WriteToConsole(message);
+    }, null);
 }
 ```
 
-The result is `DoWorkAsync` starts on a different thread, but as that thread has a synchonisation context set, the continuation is posted back to the synchonisation context where it is run.
+And when we run it, we see `main` running on thread 1 and the Message Loop running on thread 9.  All the work we post to the SC runs on the Message Loop thread.
 
-```csharp
-Application started 1 - SC :
-Message Loop running on Thread: 10 - SC : 45653674
-Queue fetching Message on Thread: 10 - SC : 45653674
-Await DoWorkAsync started 9 - SC : 45653674
-Await DoWorkAsync continuation 10 - SC : 45653674
-Queue fetching Message on Thread: 10 - SC : 45653674
+Even when we spin off code to another thread, the continuation is run on the synchronisation context thread.
+
+```text
+         ===> Message Loop Running - ThreadId: 9 - SyncContext: 62476613
+    Application started. - ThreadId: 9 - SyncContext: 62476613
+
+    Application => Post Started. - ThreadId: 9 - SyncContext: 62476613
+    DoWorkAsync started  - ThreadId: 9 - SyncContext: 62476613
+    Application => Post After. - ThreadId: 9 - SyncContext: 62476613
+--> Pause for timer to expire
+    DoWorkAsync continuation - ThreadId: 9 - SyncContext: 62476613
+
+    Application => ThreadPool Started. - ThreadId: 9 - SyncContext: 62476613
+    Application => ThreatPool After. - ThreadId: 9 - SyncContext: 62476613
+    Threadpool DoWorkAsync started - ThreadId: 3 - SyncContext: 62476613
+--> Pause for timer to expire
+    Threadpool DoWorkAsync continuation - ThreadId: 9 - SyncContext: 62476613
+
+    Application => TaskRun Started. - ThreadId: 9 - SyncContext: 62476613
+    Application => TaskRun After. - ThreadId: 9 - SyncContext: 62476613
+    Task DoWorkAsync started - ThreadId: 3 - SyncContext: 62476613
+--> Pause for timer to expire
+    Task DoWorkAsync continuation - ThreadId: 9 - SyncContext: 62476613
 ```

@@ -1,7 +1,7 @@
 ﻿using Blazr.Async;
 using Blazr.SyncronisationContext;
 
-var sc = new BlazrSynchronisationContext();
+BlazrSynchronisationContext sc = new BlazrSynchronisationContext();
 SynchronizationContext.SetSynchronizationContext(sc);
 sc.Start();
 
@@ -10,7 +10,7 @@ PostToUI("Application started - hit a key to start");
 // wait for a keyboard click to start
 Console.ReadLine();
 
-PostToUI("Application => Start running  DoWorkAsync.");
+PostToUI("Application => Start running DoWorkAsync.");
 
 sc.Post((state) => { _ = DoWorkAsync(); }, null);
 
@@ -19,7 +19,7 @@ PostToUI("Application => After DoWorkAsync Yields.");
 // wait for a keyboard click to start
 Console.ReadLine();
 
-PostToUI("Application => Start running  DoWorkAsynVoid.");
+PostToUI("Application => Start running DoWorkAsynVoid.");
 
 sc.Post(DoWorkAsyncVoid, null);
 

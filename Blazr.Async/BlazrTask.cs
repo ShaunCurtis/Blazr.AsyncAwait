@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reflection.Metadata.Ecma335;
 
-namespace Blazr.AsyncAwait;
+namespace Blazr.Async;
 
 public static class BlazrTask
 {

@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Blazr.AsyncAwait\Blazr.AsyncAwait.csproj" />
+    <ProjectReference Include="..\Blazr.Async\Blazr.Async.csproj" />
     <ProjectReference Include="..\Blazr.SyncronisationContext\Blazr.SyncronisationContext.csproj" />
   </ItemGroup>
 

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace Blazr.AsyncAwait;
+namespace Blazr.Async;
 
 public static class Awaiters
 {

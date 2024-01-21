@@ -1,20 +1,21 @@
 ﻿using Blazr.SyncronisationContext;
-using System.Runtime.CompilerServices;
 
-var sc = new BlazrSynchronisationContext();
-//SynchronizationContext.SetSynchronizationContext(sc);
-
-Utilities.WriteToConsole("Application started");
-
+BlazrSynchronisationContext sc = new BlazrSynchronisationContext();
 sc.Start();
 
-//sc.Post(DoWorkAsync, null);
+PostToUI("Application started.");
 
-//var task = Task.Run(async () =>
-//{
-//    SynchronizationContext.SetSynchronizationContext(sc);
-//    await Utilities.DoWorkTaskAsync();
-//});
+Console.ReadLine();
+
+PostToUI("Application => Post Started.");
+
+sc.Post(Utilities.DoWorkVoidAsync, null);
+
+PostToUI("Application => Post After.");
+
+Console.ReadLine();
+
+PostToUI("Application => ThreadPool Started.");
 
 ThreadPool.QueueUserWorkItem(async (state) =>
 {
@@ -22,6 +23,27 @@ ThreadPool.QueueUserWorkItem(async (state) =>
     await Utilities.DoWorkThreadpoolAsync(null);
 });
 
+PostToUI("Application => ThreatPool After.");
+
 Console.ReadLine();
-sc.Post(Utilities.DoWorkVoidAsync, null);
+
+PostToUI("Application => TaskRun Started.");
+
+var task = Task.Run(async () =>
+{
+    SynchronizationContext.SetSynchronizationContext(sc);
+    await Utilities.DoWorkTaskAsync();
+});
+
+PostToUI("Application => TaskRun After.");
+
 Console.ReadLine();
+
+
+void PostToUI(string message)
+{
+    sc.Post((state) =>
+    {
+        Utilities.WriteToConsole(message);
+    }, null);
+}

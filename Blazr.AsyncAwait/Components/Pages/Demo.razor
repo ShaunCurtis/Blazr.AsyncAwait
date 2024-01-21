@@ -27,7 +27,7 @@ Welcome to your new app.
     private async Task Clicked()
     {
         _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
-        await BlazrTask.Delay(1000);
+        await MyAwaitable.Idle(1000);
         _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
     }
 

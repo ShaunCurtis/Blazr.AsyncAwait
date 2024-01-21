@@ -1,27 +1,32 @@
-﻿using Blazr.AsyncAwait.Components.Pages;
+﻿using Microsoft.AspNetCore.Components;
 
 namespace Blazr.AsyncAwait;
 
-public class MyComponent
+public class MyComponent : ComponentBase
 {
+
+    private Task Clicked()
+    {
+        var stateMachine = new BaseStateMachine(this);
+        stateMachine.MoveNext();
+        return stateMachine.Task;
+    }
+
     private class BaseStateMachine
     {
-        private readonly Demo _parent;
+        private readonly MyComponent _parent;
 
         private readonly TaskCompletionSource _taskManager = new();
         private int _state = 0;
 
-        private Task _state0_Task = Task.CompletedTask;
-        //.. Task for each state
-
         public Task Task => _taskManager.Task;
 
-        public BaseStateMachine(Demo parent)
+        public BaseStateMachine(MyComponent parent)
         {
             _parent = parent;
         }
 
-        public void Execute()
+        public void MoveNext()
         {
             try
             {
@@ -40,9 +45,9 @@ public class MyComponent
                     // If the task yielded then the awaiter is running on a difffernt thread
                     // We add a continuation to call this Execute method when it completes
                     // and complete.  Our work is done.
-                    if (!_state0_Task.IsCompleted)
+                    if (!task1.IsCompleted)
                     {
-                        _state0_Task.ContinueWith(_ => Execute());
+                        task1.ContinueWith(_ => MoveNext());
                         return;
                     }
 

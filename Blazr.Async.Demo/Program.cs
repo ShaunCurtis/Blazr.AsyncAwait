@@ -1,6 +1,5 @@
-﻿using Blazr.AsyncAwait.Async;
+﻿using Blazr.Async;
 using Blazr.SyncronisationContext;
-using System.Runtime.CompilerServices;
 
 var sc = new BlazrSynchronisationContext();
 SynchronizationContext.SetSynchronizationContext(sc);
@@ -14,7 +13,7 @@ sc.Start();
 //    await Utilities.DoWorkThreadpoolAsync(null);
 //});
 
-var awaitable = new EmulateADataPipelineCall(2000);
+var awaitable = MyAwaitable.Idle(2000);
 await awaitable;
 
 Console.ReadLine();

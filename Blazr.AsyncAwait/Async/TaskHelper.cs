@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace Blazr.AsyncAwait;
+﻿namespace Blazr.AsyncAwait;
 
 public static class TaskHelper
 {

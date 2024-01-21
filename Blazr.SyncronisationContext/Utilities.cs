@@ -17,6 +17,7 @@ public static class Utilities
  
         Console.WriteLine($"{startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
     }
+
     public static void LogToConsole(string startMessage)
     {
         string sc = SynchronizationContext.Current is null
