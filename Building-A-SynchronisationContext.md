@@ -4,9 +4,13 @@ In this article I'll demonstrate how to build a simplistic synchronisation conte
 
 ## What is a Synchronisation Context?
 
-UI code needs to be run in the same execution context that owns the UI objects.  
+Applications with UI have a severe problwm with Threading.  Their classes are rarely thread safe, and don't support mechanisms such as `lock` to make them so.  The solution to the problem is to run all UI code on the same thread.  Code executes sequentually: no need to worry about thread safety.
 
-Consider this piece of code:
+This is what a synchronisation context provides. Older UI frameworks have solved this problem in different ways.  The `SynchronisationContext` abstracts us and the TPL from this detail.  Different implementations for different frameworks.
+
+By contrast, a console app doesn't have this problem.  You can use `lock` to ensure output isn't mixed from different threads.
+
+Consider this code:
 
 ```csharp
 async Task UIEvent()
@@ -15,9 +19,7 @@ await GetSomeDataFromAnAPI();
 UpdateGrid();
 }
 ```
-The UI handler needs somewhere to post this code, track the awaiter [running on a different thread] while the HttpClient gets the data, and ensure that the continuation is run on the UI context.
-
-This is what a synchronisation context provides in conjunction with various Task Parallel Library objects [such as `Task`].
+The UI handler needs somewhere to post this code that will track the awaiter while the HttpClient gets the data [running on a different thread], and ensure the continuation [`UpdateGrid();`] runs on the UI context.
 
 ## Coding the Objects
 

@@ -1,36 +1,38 @@
 # Awaitable
 
-Throughout these discussions I use the term *Threading Context* to describe the environment DotNetCore builds on the operating system threading infrastructure.  This is either the `Synchronisation Context` or the `Threadpool`.  These provide functionality based on the context:
+Throughout these discussions I use the term *Threading Context* to describe the environment DotNetCore builds on the operating system threading infrastructure.  This is normally either a `Synchronisation Context` or the `Threadpool`.  
 
-1. Management of `System.Threading.Timers` to call callbacks when timers expire.
-2. Management of `Awaiters` which we'll cover here.
+The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` can be awaited by the *TPL*. 
 
-Blazor adds extra functionality to manage posting Renderer activity, such as servicing the Render queue and UI generated events.
+I'll use the following terms:
 
-The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` can be awaited by the threading context. 
+ - An *Awaitable* is an object that executes some form of asynchronous behaviour and implements a `GetAwaiter` method. 
+ - An *Awaiter* is an object returned by `GetAwaiter`.
 
-`GetAwaiter` must implement this functionality:
+An *Awaiter* must implement the following functionality:
 
 ```csharp
 public struct MyAwaiter : INotifyCompletion
 {
     public bool IsCompleted;
     public void OnCompleted(Action continuation);
-    // Returns what you need
     public void GetResult();
 }
 ```
-`Task` implements these three methods and it's `GetAwaiter` returns itself.
 
-When an object yields the threading context calls `GetAwaiter` to get an object that has: 
+The awaiter providea: 
 
-1. A way to detect when the awaitable is complete.
-2. A context to execute the continuation.
-3. A return result on completion.
+1. A bool property to detect if the awaitable is complete.
+2. A method to post a continuation to be run when the awaitable is complete.
+3. A method to get the result on completion.
 
-We'll look at how this works in practice in the *Async/Await* section.
+`Task` in it's various guises implements this functionality.  It's `GetAwaiter` returns itself.
 
-Implementing a customer awaiter is complex and beyond the scope of this article.
+## Implementation
+
+Implementing a customer awaiter is complex.  This one re-invents the wheel: an alternative version of `Task.Delay`.  The code is for demonstration only.  Do not use this in a production system.
+
+
 
 ### Some Key Points
 
