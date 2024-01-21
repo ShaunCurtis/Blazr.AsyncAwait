@@ -17,6 +17,14 @@ public static class Utilities
  
         Console.WriteLine($"{startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
     }
+    public static void LogToConsole(string startMessage)
+    {
+        string sc = SynchronizationContext.Current is null
+            ? " -- Not Set -- "
+            : SynchronizationContext.Current.GetHashCode().ToString();
+
+        Console.WriteLine($"     ===> {startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
+    }
 
     public static async void DoWorkVoidAsync(object? state)
     {

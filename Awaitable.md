@@ -46,8 +46,8 @@ suggests result is `T`.  The Dev environment even tells you so.  That's just syn
 
 Miss out the `await` and `result` with now be a `Task<T>.
   
-2. An awaiter needs to know where to run it's continuation. It does so by capturing the current `SynchronizationContext` [if there was one].  If `ConfigureAwait` is true [the default], it posts the continuation back to the captured `SynchronizationContext`. 
+2. An awaiter needs to know where to run it's continuation.  While a custom awaiter does not need to respect `SynchronizationContext.Current` all the `Task` and `ValueTask` awaiter do if one exists.  Note that this only applies where `ConfigureAwait` is set to true [the default]. 
 
-3. A Task method that actually yields control will be running on a separate thread.  It's waiting on a result so blocks that thread until it can complete. 
+3. A Task method that actually yields control will be running on a separate thread.  It's waiting on a result so blocks that thread until it completes. 
 
 4. It should be clear why calling `GetResult` blocks the current thread and causes deadlocks.

@@ -1,5 +1,4 @@
 ﻿using Blazr.AsyncAwait.Components.Pages;
-using Microsoft.AspNetCore.Components;
 
 namespace Blazr.AsyncAwait;
 
