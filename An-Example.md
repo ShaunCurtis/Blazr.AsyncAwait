@@ -6,6 +6,7 @@ The only out of the ordinary code is a manual implementation of `IHandleEvent.Ha
 
 ```csharp
 @page "/"
+@using System.Runtime.CompilerServices
 @implements IHandleEvent
 
 <PageTitle>Home</PageTitle>
@@ -26,29 +27,46 @@ Welcome to your new app.
 
 @code {
     private System.Text.StringBuilder _log = new();
+    private string? _message;
+    private SynchronizationContext? _sc = SynchronizationContext.Current;
 
-    private async Task Clicked()
+    private Task Clicked( MouseEventArgs e )
     {
         _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
-        await BlazrTask.Delay(1000);
+        _message = await GetMessageAsync();
         _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
     }
 
-    async Task IHandleEvent.HandleEventAsync(Microsoft.AspNetCore.Components.EventCallbackWorkItem item, object? arg)
+    private Task<string> GetMessageAsync()
     {
-        var uiTask = item.InvokeAsync(arg);
+        _log.AppendLine($"Standard Processing at {DateTime.Now.ToLongTimeString()}");
+        await Task.Yield();
+        _log.AppendLine($"Completed Processing at {DateTime.Now.ToLongTimeString()}");
+        return $"Processed at {DateTime.Now.ToLongTimeString()}";
 
-        if (!uiTask.IsCompleted)
-        {
+    }
+
+    /// <summary>
+    /// Implements the UI event handler and overides the existing handler in ComponentBase
+    /// </summary>
+    /// <param name="item"></param>
+    /// <param name="arg"></param>
+    /// <returns></returns>
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem item, object? arg)
+    {
+            var uiTask = item.InvokeAsync(arg);
+
+            if (!uiTask.IsCompleted)
+            {
+                this.StateHasChanged();
+                await uiTask;
+            }
+
             this.StateHasChanged();
-            await uiTask;
-        }
-
-        this.StateHasChanged();
     }
 ```
 
-The conpiler will refactoring this code into modified handlers and add two state machine objects to the class.
+The compiler will refactor this code into modified handlers and add two state machine objects to the class.
 
 First the `HandleEventAsync` state machine.
 
