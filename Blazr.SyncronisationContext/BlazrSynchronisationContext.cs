@@ -6,13 +6,13 @@ public class BlazrSynchronisationContext : SynchronizationContext
 
     public override void Post(SendOrPostCallback callback, object? state)
     {
-        Utilities.LogToConsole("SyncContext Post");
+        //Utilities.LogToConsole("SyncContext Post");
         _messageQueue.Post(new WorkMessage(callback, state));
     }
 
     public override void Send(SendOrPostCallback callback, object? state)
     {
-        Utilities.LogToConsole("SyncContext Send");
+        //Utilities.LogToConsole("SyncContext Send");
         var resetEvent = new ManualResetEventSlim(false);
         try
         {

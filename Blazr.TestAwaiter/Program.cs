@@ -15,7 +15,6 @@ PostToUI("Application running after DoWorkAsyn Called");
 
 Console.ReadLine();
 
-
 void PostToUI(string message)
 {
     sc.Post((state) =>

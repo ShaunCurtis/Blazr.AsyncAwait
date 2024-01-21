@@ -23,7 +23,7 @@ public static class Utilities
             ? " -- Not Set -- "
             : SynchronizationContext.Current.GetHashCode().ToString();
 
-        Console.WriteLine($"===> {startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
+        Console.WriteLine($"     ===> {startMessage} - ThreadId: {Thread.CurrentThread.ManagedThreadId} - SyncContext: {sc}");
     }
 
     public static async void DoWorkVoidAsync(object? state)

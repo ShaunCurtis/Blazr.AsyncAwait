@@ -1,18 +1,18 @@
 ﻿using Blazr.SyncronisationContext;
 using System.Runtime.CompilerServices;
 
-namespace Blazr.AsyncAwait.Async;
+namespace Blazr.Async;
 
 public class MyAwaitable
 {
-    private volatile bool _completed;
     private volatile int _result;
-    private Action? _continuation;
-    private Timer? _timer;
-    private SynchronizationContext? _capturedContext;
-    private bool _useContext;
-    public bool IsCompleted => _completed;
+    private volatile Action? _continuation;
+    private volatile Timer? _timer;
+    private volatile SynchronizationContext? _capturedContext;
+    private volatile bool _completed;
+    private volatile bool _useContext;
 
+    public bool IsCompleted => _completed;
     public int Result => RunToCompletionAndGetResult();
 
     private MyAwaitable()
@@ -72,7 +72,7 @@ public class MyAwaitable
         ThreadPool.QueueUserWorkItem((state) =>
         {
             SynchronizationContext.SetSynchronizationContext(sc);
-            Utilities.LogToConsole("MyAwaitable instance waiting on idle period.");
+            Utilities.LogToConsole("MyAwaitable waiting on timer to expire.");
 
             var wait = new SpinWait();
             while (!awaitable._completed)
@@ -90,11 +90,10 @@ public readonly struct MyAwaiter : INotifyCompletion
     private readonly MyAwaitable awaitable;
 
     public MyAwaiter(MyAwaitable awaitable)
-    {
-        this.awaitable = awaitable;
-    }
+        =>  this.awaitable = awaitable;
 
-    public MyAwaiter GetAwaiter() => this;
+    public MyAwaiter GetAwaiter() 
+        => this;
 
     public bool IsCompleted => awaitable.IsCompleted;
 
