@@ -4,7 +4,19 @@ Async/Await is fundamental building material in modern C# coding.  It's great bl
 
 The downside is it's success: programmers just use it without the need to understand what's really going on.  Good almost all of the time, but when it doesn't work as advertised, it's very hard to understand why not. 
 
+To quote from one of the MS authors of Async/Await:
+
+> [It's] both viable and extremely common to utilize the functionality without understanding exactly what’s going on under the covers. You start with a synchronous method ...  sprinkle a few keywords, change a few method names, and you end up with [an] asynchronous method instead. 
+
 There are several very good articles available on the subject.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
+
+### Tasks
+
+A Task is a data structure that represents the state of an asynchronous operation.  It's a communications channel.  The asynchronous operation sets it's state [Completed/Not Completed] and sets the result [if there is one] of the operation.  The caller can provide a continuation at any time that gets called when the operation completes.
+
+You can walk up to any task [regardless of who started it] and attach a continuation.  That continuation will be executed, either immediately [if the task has already completed] or when the task completes, [and based on ConfigureAwait] on the executing thread or the synchronisation context.     
+
+## An Example
 
 Consider this simple Blazor `Home` page:
 
@@ -65,7 +77,7 @@ public static class TaskHelper
 
 ### The Async State Machine 
 
-When those three lines are compiled *Task Parallel Library* code generators come into action.  Your high level code is recompiled into low level TPL primitive code that builds a TPL state machine and refactors the caller to use that state machine.
+When those three lines are compiled *Task Parallel Library* code generators come into action.  Your high level code is recompiled into low level TPL primitive code that builds a async state machine and refactors the caller to use that state machine.
 
 1. `async` is a modifier and `await` is an operator.
 
@@ -77,13 +89,13 @@ When those three lines are compiled *Task Parallel Library* code generators come
  
 1. It uses a Task primitive to control the task provided by the state machine.  We'll use  `TaskCompletionSource` in our example.
 
-1. There are global `Task` variables for each async method called.  In this case `_task1_Task` to assign `DoSomethingAsync` to when we call it.
+1. There are global awaiter variables for each async method called.  In this case `_task1_Awaiter` to assign `DoSomethingAsync` to when we call it.
 
 1. The initial `_state` is `0`.
  
-1. The state machine is run by calling `Execute`.
+1. The state machine is run by calling `MoveNext`.
 
-Here's the skeleton for our three liner.
+Here's the skeleton async state machine for our three liner.
 
 ```csharp
 class Clicked_StateMachine
@@ -93,7 +105,7 @@ class Clicked_StateMachine
 
     private readonly TaskCompletionSource _tcs = new();
     private State _state = State.Start;
-    private Task _state1_Task = Task.CompletedTask;
+    private TaskAwaiter _state1_Awaiter = default!;
 
     public Task Task => _tcs.Task;
 
@@ -102,15 +114,15 @@ class Clicked_StateMachine
         _parent = parent;
     }
 
-    public void Execute()
+    public void MoveNext()
     { }
 }
 ```
 
-The `Execute` detail.  Execution is wrapped in a `try` so we can pass any exceptions to the caller through the `TaskCompletionSource`.
+The `MoveNext` detail.  Execution is wrapped in a `try` so we can pass any exceptions to the caller through the `TaskCompletionSource`.
 
 ```csharp
-public void Execute()
+public void MoveNext()
 {
     try
     {
@@ -123,6 +135,7 @@ public void Execute()
     }
 }
 ```
+
 The *State 0* step runs the code up to the first `await`.  It:
 
 1. Sets the message. 

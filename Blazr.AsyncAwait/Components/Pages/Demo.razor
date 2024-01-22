@@ -83,7 +83,7 @@ Welcome to your new app.
         private int _state = 0;
 
         // Tasks for each step
-        private Task _state_0_Task = Task.CompletedTask;
+        private TaskAwaiter _state_0_Awaiter = default!;
 
         public Task MachineTask => _taskManager.Task;
 
@@ -102,14 +102,14 @@ Welcome to your new app.
                 if (_state == 0)
                 {
                     _parent._log.AppendLine($"{this.GetType().Name}[{_state}] Processing [{Thread.CurrentThread.ManagedThreadId}] at {DateTime.Now.ToLongTimeString()}");
-                    _state_0_Task = _eventCallbackWorkItem.InvokeAsync(_eventCallbackWorkItemArgs);
+                    _state_0_Awaiter = _eventCallbackWorkItem.InvokeAsync(_eventCallbackWorkItemArgs).GetAwaiter();
 
                     _state = 1;
 
-                    if (!_state_0_Task.IsCompleted)
+                    if (!_state_0_Awaiter.IsCompleted)
                     {
                         _parent.InvokeAsync(_parent.StateHasChanged);
-                        _state_0_Task.ContinueWith(_ => MoveNext());
+                        _state_0_Awaiter.OnCompleted(MoveNext);
                         return;
                     }
                 }
