@@ -4,17 +4,19 @@ Timers are one of those *Hazy* topics.  Most programmers know how to use them an
 
 ## One Timer to Rule them All
 
-Behind the scenes there's only one running timer object.  `TimerQueue` implements the *Singleton* pattern : one instance in the AppDomain.  It manages all the application timers and schedules the callbacks when timers expire.
+Behind the scenes there's only one running timer.
 
-When you create a timer, you actually queue a timer object to `TimerQueue`. 
+`TimerQueue` implements the *Singleton* pattern : one instance in the AppDomain.  It manages all the application timers and schedules the callbacks when timers expire.
 
-Timers are creates for two purposes:
+When you create a timer, you queue a timer object to `TimerQueue`. 
+
+Timers are created for two purposes:
 
 1. Operational Timeouts.  These are system timers created and destroyed frequently. They only fire if something goes wrong.
 
 2. Scheduled Background Tasks.  These are designed to fire.  They include all the timers we create and consume in our code.
 
-`TimerQueue` is set up to run on it's own thread.
+`TimerQueue` runs on it's own thread.  The singleton creator method does this:
 
 ```csharp
 new Thread(TimerQueue.Create().Run());
@@ -22,7 +24,7 @@ new Thread(TimerQueue.Create().Run());
 
 ### The Timer Loop
 
-`TimerQueue` uses a single native timer provided by the Virtual Machine.
+`TimerQueue` uses a single native timer provided by the operating system running on the Virtual Machine.
 
 The basic operation can be summarised:
 
@@ -60,7 +62,7 @@ This adds `timer` to the queue and reschedules the native timer callback if the 
 
 1. You should `Dispose` a timer to remove it from the queue.
 
-1. The callback (or event in a System.Timers.Timer object) runs in a threadpool context, not the context of the owning object.  You must switch to the `SynchronisationContext` to run any UI based code.
+1. The callback (or event in a System.Timers.Timer object) runs in a threadpool context, not the context of the owning object.  There's automatic detection and switching to the synchronisation context.  You must manually switch to run any UI based code.
 
 
 

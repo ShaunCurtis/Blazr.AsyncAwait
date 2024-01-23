@@ -17,7 +17,7 @@ public interface IMyAwaitable
 public class MyAwaitable
 {
     private volatile int _result;
-    private volatile Action? _continuation;
+    private volatile Queue<Action> _continuations = new();
     private Timer? _timer;
     private volatile SynchronizationContext? _capturedContext;
     private volatile bool _completed;
@@ -43,7 +43,7 @@ public class MyAwaitable
 
     public void OnCompleted(Action continuation)
     {
-        _continuation = continuation;
+        _continuations.Enqueue(continuation);
         this.ScheduleContinuationIfCompleted();
     }
 
@@ -54,13 +54,20 @@ public class MyAwaitable
             return;
 
         // The awaitable has completed.
-        // Run the continuation in the correct context based on _runOnCapturedContext
-        if (_continuation is not null)
+        // Run the continuations in the correct context based on _runOnCapturedContext
+        while (_continuations.Count > 0)
         {
-            if (_runOnCapturedContext && _capturedContext != null)
-                _capturedContext.Post(_ => _continuation(), null);
-            else
-                _continuation();
+            var continuation = _continuations.Dequeue();
+            if (_continuations.Count() > 0)
+            {
+                var completedContinuations = new List<Action>();
+
+                if (_runOnCapturedContext && _capturedContext != null)
+                    _capturedContext.Post(_ => continuation(), null);
+
+                else
+                    continuation();
+            }
         }
     }
 

@@ -79,11 +79,26 @@ public interface IMyAwaitable
 1. There are only private constructors: the only way to get a `MyAwaitable` instance is through static methods.
 1. Various methods are `internal`: only available to objects within the assembly i.e. `MyAwaiter`.
 
+The public skeleton of `MyAwaitable`.
+```csharp
+public class MyAwaitable
+{
+    public bool IsCompleted { get; }
+    public int Result { get; }
+    public MyAwaiter GetAwaiter();
+    public MyAwaiter ConfigureAwait(bool useContext);
+    public void OnCompleted(Action continuation);
+    public abstract static MyAwaiter Idle(int period);
+}
+```
+
+`MyAwaitable`
+
 ```csharp
 public class MyAwaitable
 {
     private volatile int _result;
-    private volatile Action? _continuation;
+    private volatile Queue<Action> _continuations = new();
     private Timer? _timer;
     private volatile SynchronizationContext? _capturedContext;
     private volatile bool _completed;
@@ -109,42 +124,32 @@ public class MyAwaitable
 
     public void OnCompleted(Action continuation)
     {
-        _continuation = continuation;
+        _continuations.Enqueue(continuation);
         this.ScheduleContinuationIfCompleted();
     }
 
-    internal void ScheduleContinuationIfCompleted()
+    private void ScheduleContinuationIfCompleted()
     {
         // Do nothing if the awaitable is still running
         if (!_completed)
             return;
 
         // The awaitable has completed.
-        // Run the continuation in the correct context based on _runOnCapturedContext
-        if (_continuation is not null)
+        // Run the continuations in the correct context based on _runOnCapturedContext
+        while (_continuations.Count > 0)
         {
-            if (_runOnCapturedContext && _capturedContext != null)
-                _capturedContext.Post(_ => _continuation(), null);
-            else
-                _continuation();
+            var continuation = _continuations.Dequeue();
+            if (_continuations.Count() > 0)
+            {
+                var completedContinuations = new List<Action>();
+
+                if (_runOnCapturedContext && _capturedContext != null)
+                    _capturedContext.Post(_ => continuation(), null);
+
+                else
+                    continuation();
+            }
         }
-    }
-
-    public int GetResult()
-    {
-        // block the thread until completed
-        // and then return the result
-        var wait = new SpinWait();
-        while (!_completed)
-            wait.SpinOnce();
-        return _result;
-    }
-
-    internal void TimerExpired(object? state)
-    {
-        Utilities.LogToConsole("Timer Expired");
-        _result = 1;
-        _completed = true;
     }
 ```
 
@@ -296,4 +301,6 @@ Miss out the `await` and `result` with now be a `Task<T>.
 
 3. The code associated with the real work an awaitable is doing will be running on a separate thread when the calling method yields control back to the caller.  That code block will be waiting on a result so blocks the thread until it completes.  You can see this in the example above. 
 
-4. It should be clear from the above code why calling `GetResult` blocks the current thread and causes deadlocks.
+4. You can set more than one continuation on an awaitable, and you can pass a continuation to a completed awaiter and it will be executed.  
+
+5. It should be clear from the above code why calling `GetResult` blocks the current thread and causes deadlocks.
