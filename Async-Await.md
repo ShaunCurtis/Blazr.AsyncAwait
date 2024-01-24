@@ -1,20 +1,59 @@
 # Async/Await
 
-Async/Await is fundamental building material in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
+Async/Await is fundamental building material for asynchronous coding in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
 
-The downside is it's success: programmers just use it without the need to understand what's really going on.  Good almost all of the time, but when it doesn't work as advertised, it's very hard to understand why not. 
+The downside is it's opacity: programmers just use it, there's no need to understand what's really going on.  Good until you try and make it do something it wasn't designed for. 
 
-To quote from one of the MS authors of Async/Await:
+To quote Stephen Tomb, one of the authors of Async/Await:
 
 > [It's] both viable and extremely common to utilize the functionality without understanding exactly what’s going on under the covers. You start with a synchronous method ...  sprinkle a few keywords, change a few method names, and you end up with [an] asynchronous method instead. 
 
-There are several very good articles available on the subject.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
+There are several very good articles available on the subject, including a very detsiled one by Stephen.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
 
-### Tasks
+## Tasks
 
-A Task is a data structure that represents the state of an asynchronous operation.  It's a communications channel.  The asynchronous operation sets it's state [Completed/Not Completed] and sets the result [if there is one] of the operation.  The caller can provide a continuation at any time that gets called when the operation completes.
+Another fundimental building block.
+
+People get very confused about `Task`.  It has no life of it's own.  It doesn't manage the background process.
+
+It's a `struct` that represents the state of an asynchronous operation.  A communications channel.
+
+It's returned to the caller in one of four states:
+1. Completed - probably the most common.  
+2. Not Completed - there's a background task running somewhere else that in process and the Task's result hasn't yet been set.
+3. Faulted - A exception has happened which the Task returns.
+4. Cancelled - A cancellation token request has successful.  The operation was cancelled.
+
+It's important to understand that the state of the Task is unrelated to the code block that returned it.  The code block has completed.  If it hasn't conpleted, the continuation [the code block to be executed after the point at which the executung block yielded control] is captured and will be sceduled to run by the background process once it completes.  We'll look at how it does that shortly.
+
+The asyncronous background operation started by the process holds a reference to the task, and when it completes, sets the task's state to Completed and the task's result [if there is one].
 
 You can walk up to any task [regardless of who started it] and attach a continuation.  That continuation will be executed, either immediately [if the task has already completed] or when the task completes, [and based on ConfigureAwait] on the executing thread or the synchronisation context.     
+
+## Async/Await
+
+*Async/Await* is opaque because what you see is very different from what you get.
+
+The simple looking:
+
+```csharp
+    await TaskHelper.DoSomethingAsync();
+```
+
+gets transformed by the compiler into a async state machine.
+
+The original code block is split on `await` lines.  You get `n+1` states and code blocks.  It creates a public Task object which it sets to not complete.
+
+When the state machine executes [by calling `MoveNext`],  the first block runs synchronously to the final async operation [the *await* line] and increments the state. The block either completes or yields control.
+
+If the async operation completes, then execution falls through to the next block, and so on...
+
+If the async operation yields [returns a not complete awaitable such as a Task], the state machine adds a continuation to the awaitable to call `MoveNext` and completes.
+
+When the async operation completes on it's background thread it queues the continuation to run [normally on the synchronisation context].  That "re-enters" the state machine which then executes the next state's code block.
+
+The final state block has no async operation and falls through to the bottom where it sets the state machine's own Task result and it's state to completed.
+
 
 ## An Example
 
@@ -77,7 +116,7 @@ public static class TaskHelper
 
 ### The Async State Machine 
 
-When those three lines are compiled *Task Parallel Library* code generators come into action.  Your high level code is recompiled into low level TPL primitive code that builds a async state machine and refactors the caller to use that state machine.
+When those three lines are compiled *Task Parallel Library* code generators come into action.  Your high level code is recompiled into low level TPL primitive code that builds a async state machine and refactors the caller to use the state machine.
 
 1. `async` is a modifier and `await` is an operator.
 
@@ -140,12 +179,12 @@ The *State 0* step runs the code up to the first `await`.  It:
 
 1. Sets the message. 
 2. Calls `DoSomethingAsync` on the parent and assigns it to `_state1_Task`.  
-3. Sets the `_state` to the next state.  
+3. Increments `_state` to the next state.  
 4. Checks the state of `_state1_Task`.  
    
- - If the task has yielded then a continuation is set on the task to call `Execute` when it completes.  
+ - If the task has yielded control, a continuation is set on the task to call `Execute` when it completes.  
  - If it has an exception or is cancelled then the appropriate state is set on the _taskManager.  
- - If the task is complete then the method falls through into the next state and executes the next step synchronously.  There's no continuation and no yield.
+ - If the task is complete, the method falls through into the next state and executes the next step synchronously.  There's no continuation and no yield.
 
 ```csharp
     if (_state == 0)
