@@ -1,6 +1,6 @@
 # Async/Await
 
-Async/Await is fundamental building material for asynchronous coding in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
+Async/Await is fundamental building material for asynchronous operations in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
 
 The downside is it's opacity: programmers just use it, there's no need to understand what's really going on.  Good until you try and make it do something it wasn't designed for. 
 
@@ -30,9 +30,44 @@ The asyncronous background operation started by the process holds a reference to
 
 You can walk up to any task [regardless of who started it] and attach a continuation.  That continuation will be executed, either immediately [if the task has already completed] or when the task completes, [and based on ConfigureAwait] on the executing thread or the synchronisation context.     
 
+## Awaitables and Awaiters
+
+To use `await` the awaited method must be awaitable: it must implement a `GetAwaiter` method, and `GetAwaiter` must return an object that implements the *awaiter* pattern.
+
+You can't await an `Int32`, or can you?
+
+Instead of coding:
+
+```csharp
+  await Task.Delay(500);
+```
+
+What if you could type:
+
+```csharp
+   await 500;
+```
+
+Out of context, it's not particularly obvious, but it's certainly succinct.
+
+You can!  All you need to implement is the awaitable pattern that returns an awaiter.
+
+It's this simple: 
+
+```csharp
+public static TaskAwaiter GetAwaiter(this Int32 milliseconds)
+{
+    return Task.Delay(milliseconds).GetAwaiter();
+}
+```
+
+We're calling `Task.Delay(milliseconds)` and returning it's awaiter.
+
+We'll look into awaiters and awaitable in more detail in the *Awaitable* article.  
+
 ## Async/Await
 
-*Async/Await* is opaque because what you see is very different from what you get.
+*Async/Await* is opaque.  What you see is very different from what you get.
 
 The simple looking:
 
@@ -42,7 +77,31 @@ The simple looking:
 
 gets transformed by the compiler into a async state machine.
 
-The original code block is split on `await` lines.  You get `n+1` states and code blocks.  It creates a public Task object which it sets to not complete.
+Go to [SharpLab](https://sharplab.io/).  Set the output to *C#* and enter the following code:
+
+```csharp
+using System;
+using System.Threading.Tasks;
+
+public class C {
+    public async Task DoSomeWorkAsync() {
+        Console.WriteLine("Starting");
+        await DoSomethingAsync();
+        Console.WriteLine("Finished");
+    }
+    
+    private Task DoSomethingAsync()
+    {
+        return Task.Delay(500);
+    }
+}
+```
+
+See the difference.  It looks very complicated, but let's break it down.  You now have a private *Async State Machine* within you parent class, and a refactored `DoSomeWorkAsync`. The `async` and `await` have disappeared.
+
+The original code block has been split on lines containing an `await`.  You have `n+1` states and code blocks.
+
+The state machine has a public Task object which to represent it's state to the caller.
 
 When the state machine executes [by calling `MoveNext`],  the first block runs synchronously to the final async operation [the *await* line] and increments the state. The block either completes or yields control.
 
@@ -128,7 +187,7 @@ When those three lines are compiled *Task Parallel Library* code generators come
  
 1. It uses a Task primitive to control the task provided by the state machine.  We'll use  `TaskCompletionSource` in our example.
 
-1. There are global awaiter variables for each async method called.  In this case `_task1_Awaiter` to assign `DoSomethingAsync` to when we call it.
+1. There are class level awaiter variables for each async method called.  In this case `_task1_Awaiter` to assign `DoSomethingAsync` to when we call it.
 
 1. The initial `_state` is `0`.
  
