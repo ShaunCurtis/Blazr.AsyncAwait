@@ -1,38 +1,35 @@
 # Async/Await
 
-Async/Await is fundamental building material for asynchronous operations in modern C# coding.  It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  
+Async/Await is the fundamental building material of asynchronous operations in modern C#.
 
-The downside is it's opacity: programmers just use it, there's no need to understand what's really going on.  Good until you try and make it do something it wasn't designed for. 
+It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.   The downside is it's opacity: programmers just use it, most don't understand what's going on beneath the surface.  It's great until you try and make it do something it wasn't designed for. 
 
 To quote Stephen Tomb, one of the authors of Async/Await:
 
 > [It's] both viable and extremely common to utilize the functionality without understanding exactly what’s going on under the covers. You start with a synchronous method ...  sprinkle a few keywords, change a few method names, and you end up with [an] asynchronous method instead. 
 
-There are several very good articles available on the subject, including a very detsiled one by Stephen.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
+There are several very good articles available on the subject, including a very detailed one by Stephen.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
 
-## Tasks
+**Async**
 
-Another fundimental building block.
+Async is a compiler directive.  It labels a method as containing one or more awaitable calls to async methods.
 
-People get very confused about `Task`.  It has no life of it's own.  It doesn't manage the background process.
+**Await**
 
-It's a `struct` that represents the state of an asynchronous operation.  A communications channel.
-
-It's returned to the caller in one of four states:
-1. Completed - probably the most common.  
-2. Not Completed - there's a background task running somewhere else that in process and the Task's result hasn't yet been set.
-3. Faulted - A exception has happened which the Task returns.
-4. Cancelled - A cancellation token request has successful.  The operation was cancelled.
-
-It's important to understand that the state of the Task is unrelated to the code block that returned it.  The code block has completed.  If it hasn't conpleted, the continuation [the code block to be executed after the point at which the executung block yielded control] is captured and will be sceduled to run by the background process once it completes.  We'll look at how it does that shortly.
-
-The asyncronous background operation started by the process holds a reference to the task, and when it completes, sets the task's state to Completed and the task's result [if there is one].
-
-You can walk up to any task [regardless of who started it] and attach a continuation.  That continuation will be executed, either immediately [if the task has already completed] or when the task completes, [and based on ConfigureAwait] on the executing thread or the synchronisation context.     
+Defines a method that should be awaited for continuing execution of the code below the await.  Only methods that implement the *awaitable* pattern can be awaited.
 
 ## Awaitables and Awaiters
 
-To use `await` the awaited method must be awaitable: it must implement a `GetAwaiter` method, and `GetAwaiter` must return an object that implements the *awaiter* pattern.
+To use `await` the awaited method must be awaitable: it must implement a `GetAwaiter` method, and must return an object that implements the *awaiter* pattern.
+
+```csharp
+public struct MyAwaiter : INotifyCompletion
+{
+    public bool IsCompleted;
+    public void OnCompleted(Action continuation);
+    public void GetResult();
+}
+```
 
 You can't await an `Int32`, or can you?
 
@@ -48,9 +45,9 @@ What if you could type:
    await 500;
 ```
 
-Out of context, it's not particularly obvious, but it's certainly succinct.
+Out of context, it's not particularly obvious what it does, but it's certainly succinct.
 
-You can!  All you need to implement is the awaitable pattern that returns an awaiter.
+Yes, you guessed, you can.  All you need is for `Int32` to implement the awaitable pattern and return an awaiter.
 
 It's this simple: 
 
@@ -65,17 +62,31 @@ We're calling `Task.Delay(milliseconds)` and returning it's awaiter.
 
 We'll look into awaiters and awaitable in more detail in the *Awaitable* article.  
 
+
+
+## Tasks
+
+Tasks are another fundimental building block.  They revolutionised async progrsmming whwn they came along.
+
+`Task` in all it's guises is an implementation of an awaitable.  It returns a `TaskAwaiter` that implements the *awaitable* pattern.
+
+A `Task` is a simple `struct` that represents the state of an asynchronous operation. It's a handle providing a communications channel between the caller and the asynchronous background operation.
+
+It's returned to the caller in one of four states:
+1. Completed - probably the most common.  
+2. Not Completed - there's a background task running somewhere else that#s in-process.  The Task's result isn't yet set.
+3. Faulted - A exception has occured which the task returns.
+4. Cancelled - A cancellation token request was successful.  The operation was cancelled.
+
+It's important to understand that the state of the Task is unrelated to the code block that returned it.  The code block has completed.  If the task hasn't conpleted, the continuation [the code block below the await] is captured and will be sceduled to run in the future by the background process when it completes.  We'll look at how it does that shortly.
+
+The asyncronous background operation holds a reference to the task.  When it completes it sets the task's state to Completed and the task's result [if there is one].
+
+You can walk up to any task [regardless of who started it] and attach a continuation.  That continuation will be executed immediately [if the task has already completed] or when the task completes.  Where it runs is based on ConfigureAwait: false - on the executing thread ; true: on the synchronisation context. 
+
 ## Async/Await
 
-*Async/Await* is opaque.  What you see is very different from what you get.
-
-The simple looking:
-
-```csharp
-    await TaskHelper.DoSomethingAsync();
-```
-
-gets transformed by the compiler into a async state machine.
+To demonstrate how opaque *Async/Await* really is, let's look at the code generated by the compiler.
 
 Go to [SharpLab](https://sharplab.io/).  Set the output to *C#* and enter the following code:
 
@@ -97,13 +108,34 @@ public class C {
 }
 ```
 
-See the difference.  It looks very complicated, but let's break it down.  You now have a private *Async State Machine* within you parent class, and a refactored `DoSomeWorkAsync`. The `async` and `await` have disappeared.
+At first glance, the code is complex and unrecognisable.  Let's break it down.  You now have:
 
-The original code block has been split on lines containing an `await`.  You have `n+1` states and code blocks.
+1. A private *Async State Machine* within you parent class
+2. A refactored `DoSomeWorkAsync`.
+ 
+`Async` and `await` have disappeared.
 
-The state machine has a public Task object which to represent it's state to the caller.
+Look at the state machine.  The original code block has been split into `n+1` states and code blocks based on awaits.
 
-When the state machine executes [by calling `MoveNext`],  the first block runs synchronously to the final async operation [the *await* line] and increments the state. The block either completes or yields control.
+The state machine provides a public Task object [through the `AsyncTaskMethodBuilder`] which is returned to the caller when the state machine yields control.
+
+The refactored `DoSomeWorkAsync` creates and starts the state machine.
+
+```csharp
+    [AsyncStateMachine(typeof(<DoSomeWorkAsync>d__0))]
+    [DebuggerStepThrough]
+    public Task DoSomeWorkAsync()
+    {
+        <DoSomeWorkAsync>d__0 stateMachine = new <DoSomeWorkAsync>d__0();
+        stateMachine.<>t__builder = AsyncTaskMethodBuilder.Create();
+        stateMachine.<>4__this = this;
+        stateMachine.<>1__state = -1;
+        stateMachine.<>t__builder.Start(ref stateMachine);
+        return stateMachine.<>t__builder.Task;
+    }
+```
+
+`__builder.Start` internally calls `MoveNext`,  the first block runs synchronously to the final async operation [the *await* line] and increments the state. The block either completes or yields control.
 
 If the async operation completes, then execution falls through to the next block, and so on...
 
