@@ -8,29 +8,29 @@ To quote Stephen Tomb, one of the authors of Async/Await:
 
 > [It's] both viable and extremely common to utilize the functionality without understanding exactly what’s going on under the covers. You start with a synchronous method ...  sprinkle a few keywords, change a few method names, and you end up with [an] asynchronous method instead. 
 
-There are several very good articles available on the subject, I've included references to several that were the source material for this article.  Unfortunately most assume a level of knowledge that most programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level of normal mortals.
+There are several very good articles available on the subject, I've included references to several that were the source material for this article.  Unfortunately most assume a level of knowledge mortal programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level that most will understand.
 
 **Async**
 
-Async is a compiler directive.  It labels a method as containing one or more awaitable calls to async methods.
+Async is a compiler directive.  It labels a method as containing one or more awaitable async calls.
 
 **Await**
 
-Defines a call to a method that should be awaited.  Any  code below the call should only execute once the awaitable has completed.  Only methods that implement the *awaitable* pattern can be awaited.  `Task` is the most common awaitable, but there are others.
+Defines an async call that should be awaited.  Any code following the call should only execute once the awaitable has completed.  Only methods implementing the *awaitable* pattern can be awaited.  `Task` is the most common awaitable, but there are others.
 
 **Yielding**
 
-Yielding is when the background operation behind an async code block shifts threads and frees the current context to continue processing it's queue. It returns a reference to an awaitable object that the background operation will update when complete.  
+Yielding happens when the background operation behind an async call shifts threads and frees the current context to continue processing it's queue. The process returns a reference to an awaitable object the background operation updates when complete.  
 
 **Continuation**
 
-A continuation is the block of code after an await line.  It represents code that should only be run after the await line completes.  It may or may not consume the result of the await.
+A continuation is the block of code following an await line.  It encapsulates the code to run after the await completes.  It may or may not consume the result of the await.
 
 ## Awaitables and Awaiters
 
-To apply `await` to a method, the method must be awaitable.  It must implement a `GetAwaiter` method that returns an object that implements the *awaiter* pattern.
+You can only `await` a method that implementa the *awaitable* pattern: it must implement a `GetAwaiter` method that returns an object that implements the *awaiter* pattern.
 
-This is the pattern.
+The *Awaiter* pattern.
 
 ```csharp
 public struct MyAwaiter : INotifyCompletion
@@ -43,19 +43,19 @@ public struct MyAwaiter : INotifyCompletion
 
 You can't await an `Int32`.  Or can you?
 
-Instead of coding:
+Can:
 
 ```csharp
   await Task.Delay(500);
 ```
 
-What if you could type:
+be coded as:
 
 ```csharp
    await 500;
 ```
 
-Out of context, it's not particularly obvious what it does, but it's certainly succinct.
+It's not particularly obvious what it does out of context, but it's certainly succinct.
 
 It turns out you can.  You just need to implement the awatable pattern on `Int32`.
 
@@ -68,15 +68,15 @@ public static TaskAwaiter GetAwaiter(this Int32 milliseconds)
 }
 ```
 
-We add `GetAwaiter` as an extension method, call `Task.Delay(milliseconds)` and return it's awaiter.
+Add `GetAwaiter` as an extension method, call `Task.Delay(milliseconds)` and return it's awaiter.
 
 We'll look into *awaiters* and *awaitable* in more detail in the *Awaitable* article.  
 
 ## Tasks
 
-Tasks are another fundimental building block.  They revolutionised async programming when they came along.
+Tasks are another fundimental *TPL* building block.
 
-`Task` in all it's guises is an implementation of an awaitable.  It returns a `TaskAwaiter` that implements the *awaiter* pattern.
+`Task`, in all it's guises, is an implementation of an awaitable.  It returns a `TaskAwaiter` that implements the *awaiter* pattern.
 
 A `Task` is a simple `struct` that represents an asynchronous operation. It's a handle that provides a communications channel between the caller and the asynchronous background operation.
 
@@ -87,9 +87,7 @@ It's returned to the caller in one of four states:
 3. Faulted - A exception has occured which the task returns.
 4. Cancelled - A cancellation token request was successful.  The operation was cancelled.
 
-It's important to understand that the state of the Task is unrelated to the code block that returned it.  The code block has completed.
-
-If the task hasn't completed, the continuation is captured and will be sceduled to run in the future by the background process when it completes.  We'll look at how it does that shortly.
+It's important to understand that the state of the Task is unrelated to the code block that returned it.  If your code block is handed a `Task`, the immediate code has completed.  Code may have been parcelled up as a continuation or as a block of code to run in the future in an *Async State Machine* block, but the thread your code is running on is free to continue. The continuation or state machine code will be scheduled to run when appropriate.  We'll look at how this works shortly.
 
 The asyncronous background operation holds a reference to the task.  When it completes it:
 
@@ -101,7 +99,7 @@ You can walk up to any task [regardless of who started it] and attach a continua
 
 Where continuations run is based on ConfigureAwait: 
 
-1. false - on any threadpool thread ; 
+1. false - on any threadpool thread. 
 2. true - on the synchronisation context if one exists. 
 
 The `public` side of `Task` is for consumers: there's no control mechanisms. The control side is `internal`.  The state machine accesses this functionality through `AsyncTaskMethodBuilder`.  We normally use a `TaskCompletionSource` object. You'll see this used in our example state machine shortly.
@@ -137,7 +135,7 @@ The generated code is complex and unrecognisable.  Let's break it down.  You now
  
 `Async` and `await` have disappeared.
 
-Look at the state machine.  The original code block has been split into `n+1` states and code blocks based on awaits.
+Look at the state machine.  The original code block has been split into `n+1` states and code blocks based on `awaits`.
 
 The state machine provides a public Task object [through the `AsyncTaskMethodBuilder`] which is returned to the caller when the state machine yields control.
 
@@ -163,12 +161,14 @@ If the async operation completes, then execution falls through to the next block
 
 If the async operation yields [returns a not complete awaitable such as a Task], the state machine adds a continuation to the awaitable to call `MoveNext` and completes.
 
-When the async operation completes on it's background thread it queues the continuation to run [normally on the synchronisation context].  That "re-enters" the state machine which then executes the next state's code block.
+When the async operation completes on it's background thread it queues the continuation to run [normally on the synchronisation context].  The continuation "re-enters" the state machine and executes the next state code block.
 
-The final state block has no async operation and falls through to the bottom where it sets the state machine's own Task result and it's state to completed.
+The final state block has no final async operation so falls through to the bottom where it sets the state machine's own Task result and state to completed.
 
 
-## An Example
+### Our Own State Machine
+
+We've seen what the compiler produces, but we can build our own state machine as a learning exercise.
 
 Consider this simple Blazor `Home` page:
 
@@ -182,8 +182,7 @@ Consider this simple Blazor `Home` page:
 Welcome to your new app.
 
 <div class="mb-3">
-    <button class="btn btn-success" @onclick="Clicked">Responsive Click</button>
-    <button class="btn btn-danger" @onclick="_Clicked">Unresponsive Click</button>
+    <button class="btn btn-success" @onclick="Clicked">Click</button>
 </div>
 
 <div class="bg-dark text-white m-2 p-2">
@@ -199,17 +198,8 @@ Welcome to your new app.
         await TaskHelper.DoSomethingAsync();
         _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
     }
-
-    private async Task _Clicked()
-    {
-        _message = $"Processing at {DateTime.Now.ToLongTimeString()}";
-        await TaskHelper.PretendToDoSomethingAsync();
-        _message = $"Completed Processing at {DateTime.Now.ToLongTimeString()}";
-    }
 }
 ```
-
-*Responsive Click* shows each message in turn.  *Unresponsive Click* shows both messages on completion. 
 
 `TaskHelper` looks like this:
 
@@ -218,23 +208,13 @@ public static class TaskHelper
 {
     public static Task DoSomethingAsync()
         => Task.Delay(1000);
-
-    public static Task PretendToDoSomethingAsync()
-    {
-        Thread.Sleep(1000);
-        return Task.CompletedTask;
-    }
 }
 ```
 
-### Our Own State Machine
-
-We've seen what the compiler produces, but we can build our own state machine as a learning exercise.
-
 Here's the skeleton class.
 
-1. We capture a reference to the parent class so we have access to any class variables, properties and methods.  Being a class with the parent gives us access to all the privates.
-2. `TaskCompletionSource` provides a `Task` that we control.  This is the Task we return to the caller.
+1. We capture a reference to the parent class so we have access to any class variables, properties and methods.  Being a class within the parent gives us access to all the privates.
+2. `TaskCompletionSource` provides a `Task` that we control.  This is the `Task` we return to the caller.
 3. `_state` holds the current state of the machine.  It gets incremented as we step through the states.
 4. `Task` is the actual task the `TaskCompletionSource` provides.
 5. `MoveNext` is the method we call to start and increment the state. 
@@ -262,7 +242,7 @@ class Clicked_StateMachine
 
 The `MoveNext` detail.  
 
-Execution is wrapped in a `try` to cature exceptions and report them to the caller through the  `TaskCompletionSource` task.
+Execution is wrapped in a `try` to capture exceptions and report them to the caller through the  `TaskCompletionSource` task.
 
 ```csharp
 public void MoveNext()
@@ -289,7 +269,7 @@ It:
 
 Finally it checks the state of `task`.  
    
- - If it's imcomplete, it adds a continuation to the task to call `MoveNext` on completion.  
+ - If it's incomplete, it adds a continuation to the task to call `MoveNext` on completion.  
  - If it's complete, it falls through to the next state and execution continues synchronously on the same context.
 
 ```csharp
@@ -312,7 +292,7 @@ Finally it checks the state of `task`.
     }
 ```
 
-Step 1 first checks `_state1_Task` for exceptions and cancellation.  If it completed successfully it runs the code to completion [sets the message].  As there's no further awaits it falls out of the bottom to the finalization process.
+Step 1 only runs once state 0's async operation has completed.  It runs state 1 code.  As there's no further awaits it falls out of the bottom to the finalization process.
 
 ```csharp
     // Step 1 - the first await block
