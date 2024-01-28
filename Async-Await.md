@@ -82,12 +82,12 @@ A `Task` is a simple `struct` that represents an asynchronous operation. It's a 
 
 It's returned to the caller in one of four states:
 
-1. Completed - probably the most common.  
-2. Not Completed - there's a background task running somewhere else that's in-process.  The Task's result isn't yet set.
+1. Completed - probably the most common.  It's safe to get the result.
+2. Not Completed - there's a background task running somewhere else that's in-process.  The Task's result isn't yet set.  If you try and get it, you will block your thread.
 3. Faulted - A exception has occured which the task returns.
 4. Cancelled - A cancellation token request was successful.  The operation was cancelled.
 
-It's important to understand that the state of the Task is unrelated to the code block that returned it.  If your code block is handed a `Task`, the immediate code has completed.  Code may have been parcelled up as a continuation or as a block of code to run in the future in an *Async State Machine* block, but the thread your code is running on is free to continue. The continuation or state machine code will be scheduled to run when appropriate.  We'll look at how this works shortly.
+It's important to understand that the state of the returned `Task` is unrelated to the state of the code block that returned it.  If your code block is handed a `Task`, the immediate code behind the call has completed.  Code may have been parcelled up as a continuation or as a block of code within the *Async State Machine*, but the thread your code is running on is free. The continuation or state machine code will be scheduled to run when appropriate.  We'll look at how this works shortly.
 
 The asyncronous background operation holds a reference to the task.  When it completes it:
 
@@ -95,7 +95,7 @@ The asyncronous background operation holds a reference to the task.  When it com
 2. Sets the task's result [if there is one].
 3. Schedules any registered continuations.
 
-You can walk up to any task [regardless of who started it] and attach a continuation.  That continuation will be executed immediately if the task has already completed, or added to the awaiter's continuation collection if not.
+You can attach a continuation to any task regardless of who created it.  That continuation will be executed immediately if the task has already completed, or added to the awaiter's continuation collection if not.
 
 Where continuations run is based on ConfigureAwait: 
 
