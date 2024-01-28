@@ -2,7 +2,7 @@
 
 Async/Await is the fundamental building material of asynchronous operations in modern C#.
 
-It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.   The downside is it's opacity:  it deceives with it's simplicity.  What you see is not what you get below the surface.
+It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.   The downside is it deceives with it's simplicity.  What you see is not what you get below the surface.
 
 To quote Stephen Tomb, one of the authors of Async/Await:
 
@@ -57,7 +57,7 @@ be coded as:
 
 It's not particularly obvious what it does out of context, but it's certainly succinct.
 
-It turns out you can.  You just need to implement the awatable pattern on `Int32`.
+It turns out you can.  You just need to implement the awaitable pattern on `Int32`.
 
 It's this simple. 
 
