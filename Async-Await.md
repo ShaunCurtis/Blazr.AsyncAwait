@@ -2,7 +2,7 @@
 
 Async/Await is the fundamental building material of asynchronous operations in modern C#.
 
-It's great blessing is it abstracts the programmer from the nitty gritty of the *Task Processing Library*.   The downside is it deceives with it's simplicity.  What you see is not what you get below the surface.
+On the plus side, it abstracts the programmer from the nitty gritty of the *Task Processing Library*.  On the downside is deception, what you see is not what you get below the surface.
 
 To quote Stephen Tomb, one of the authors of Async/Await:
 
