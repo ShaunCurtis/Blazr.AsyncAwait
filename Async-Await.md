@@ -8,7 +8,7 @@ To quote Stephen Tomb, one of the authors of Async/Await:
 
 > [It's] both viable and extremely common to utilize the functionality without understanding exactly what’s going on under the covers. You start with a synchronous method ...  sprinkle a few keywords, change a few method names, and you end up with [an] asynchronous method instead. 
 
-There are several very good articles available on the subject, I've included references to several that were the source material for this article.  Unfortunately most assume a level of knowledge mortal programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level that most will understand.
+There are several very good articles available on the subject, I've included references to those that were the source material for this article.  Unfortunately most assume a level of knowledge mortal programmers don't have.  In this short article I'll attempt to bring that required knowledge down to the level that most will understand.
 
 **Async**
 
@@ -20,7 +20,7 @@ Defines an async call that should be awaited.  Any code following the call shoul
 
 **Yielding**
 
-Yielding happens when the background operation behind an async call shifts to a different thread and frees the current context to continue processing it's queue. The process returns a reference to an awaitable object that the background operation updates when complete.  
+Yielding occurs when the background operation behind an async call shifts to a different thread and frees the current context to continue processing it's queue. The process returns a reference to an awaitable object that the background operation updates when complete.  
 
 **Continuation**
 
@@ -28,7 +28,7 @@ A continuation is the block of code following an await statement.  It encapsulat
 
 ## Awaitables and Awaiters
 
-You can only `await` a method that implementa the *awaitable* pattern: it must implement a `GetAwaiter` method that returns an object that implements the *awaiter* pattern.
+You can only `await` a method that implements the *awaitable* pattern: a `GetAwaiter` method that returns an object implementing the *awaiter* pattern.
 
 The *Awaiter* pattern.
 
