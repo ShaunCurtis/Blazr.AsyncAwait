@@ -12,7 +12,7 @@ There are several very good articles available on the subject, I've included ref
 
 **Async**
 
-Async is a compiler directive.  It labels a method as containing one or more awaitable async calls.
+Async is a modifier.  It labels a method as containing one or more awaitable async calls.
 
 **Await**
 
@@ -20,11 +20,11 @@ Defines an async call that should be awaited.  Any code following the call shoul
 
 **Yielding**
 
-Yielding happens when the background operation behind an async call shifts threads and frees the current context to continue processing it's queue. The process returns a reference to an awaitable object the background operation updates when complete.  
+Yielding happens when the background operation behind an async call shifts to a different thread and frees the current context to continue processing it's queue. The process returns a reference to an awaitable object that the background operation updates when complete.  
 
 **Continuation**
 
-A continuation is the block of code following an await line.  It encapsulates the code to run after the await completes.  It may or may not consume the result of the await.
+A continuation is the block of code following an await statement.  It encapsulates the code to run after the await completes.  It may or may not consume the result of the await.
 
 ## Awaitables and Awaiters
 
