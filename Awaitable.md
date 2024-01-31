@@ -299,7 +299,7 @@ Miss out the `await` and `result` with now be a `Task<T>.
   
 2. `Task` and all it incarnations respect `SynchronizationContext.Current`, and run the continuation on that context if `ConfigureAwait` is true [the default]. 
 
-3. The code associated with the real work an awaitable is doing will be running on a separate thread when the calling method yields control back to the caller.  That code block will be waiting on a result so blocks the thread until it completes.  You can see this in the example above. 
+3. Async methods that need to await a result [from another process] must run on a separate background thread.  The action of awaiting blocks the thread.  Switching this await, along with responsibility to schedule the continuations, to a separate thread frees the initial thread.  This is the process of yielding.  You can see this in the example above. 
 
 4. You can set more than one continuation on an awaitable, and you can pass a continuation to a completed awaiter and it will be executed.  
 

@@ -15,3 +15,15 @@ Creating your own isn't that difficult, ConcurrentQueue and delegates help a lot
 You need a very different programming style, the kind that you'd be familiar with from a GUI app. Code cannot take too long since it gums up the dispatcher loop, preventing invoke requests from getting dispatched. In a GUI app pretty noticeable by the UI becoming unresponsive, in your sample code you'll notice that your method is slow to complete since the continuation can't run for a while. You need a worker thread to spin-off slow code, there is no free lunch.
 
 Worthwhile to note why this stuff exists. GUI apps have a severe problem, their class libraries are never thread-safe and can't be made safe by using lock either. The only way to use them correctly is to make all the calls from the same thread. InvalidOperationException when you don't. Their dispatcher loop help you do this, powering Begin/Invoke and async/await. A console does not have this problem, any thread can write something to the console and lock can help to prevent their output from getting intermingled. So a console app shouldn't need a custom SynchronizationContext. YMMV.
+
+
+
+ME
+
+============================
+
+Lets assume out initial code is a block of code posted to the synchronisation context.
+
+The async code executes it runs code synchronously until it reaches a real wait: a step that needs to wait for some external action to happen and return a result.  In the synchronous world, this blocks the synchronisation context until the external action completes and unblocks.
+
+In an asynchronous context, the waiter is run on separate background thread.  There's more.  The awaiter is also responsible for scheduling the rest of the the code in the posted block.    
