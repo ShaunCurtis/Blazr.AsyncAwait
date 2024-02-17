@@ -1,12 +1,12 @@
 # Timers
 
-Timers are one of those *Hazy* topics.  Most programmers know how to use them and the various implementations.  But. how do they actually work?  
+Timers are one of those *fuzzy* topics.  Most programmers know how to use them and the various implementations.  But, how do they actually work?  
 
 ## One Timer to Rule them All
 
 Behind the scenes there's only one running timer.
 
-`TimerQueue` implements the *Singleton* pattern : one instance in the AppDomain.  It manages all the application timers and schedules the callbacks when timers expire.
+`TimerQueue` implements the *Singleton* pattern : one instance per AppDomain.  It manages all the application timers and schedules the callbacks when timers expire.
 
 When you create a timer, you queue a timer object to `TimerQueue`. 
 
@@ -24,27 +24,27 @@ new Thread(TimerQueue.Create().Run());
 
 ### The Timer Loop
 
-`TimerQueue` uses a single native timer provided by the operating system running on the Virtual Machine.
+`TimerQueue` uses a single native timer provided by the underlying operating system, normally provided by the Virtual Machine.
 
-The basic operation can be summarised:
+The basic operation can be summarised as:
 
 ```csharp
 void Resume()
 {
     FireAllExpiredTimers();
-    nextTimeSpan = UnexpiredTimers.ShortestTimeSpanToExpiration();
+    nextTimeSpan = UnexpiredTimers.GetShortestTimeSpanToExpiration();
     NativeTimer.ScheduleCallback(Resume, nextTimeSpan);
 }
 ```
 
-The native timer triggers `Resume`.  It enumerates the currently registered timers and:
+The native timer triggers `Resume`.  `Resume`:
 
-1. Fires the callbacks on any that have expired.  It fires the first on the current thread and any subsequent ones on a threadpool thread.  
-1. Keeps track of the minimum time to expire period for all the unexpired timers.
+1. Enumerates the currently registered timers and fires the callbacks on any that have expired.  It fires the first on the current thread and any subsequent ones on a threadpool thread.  
+1. Gets the shortest timespan for all the unexpired timers.
 
 Once complete it schedules a callback from the Native timer for the minumim period.  Note that the resolution of `nextTimeSpan` will be based on the resolution of the system clock: approx 15 ms on a Windows Server.   
 
-Adding a new timer:
+Adding a new timer looks like this:
 
 ```csharp
 void AddTimer(Timer timer)
@@ -62,7 +62,7 @@ This adds `timer` to the queue and reschedules the native timer callback if the 
 
 1. You should `Dispose` a timer to remove it from the queue.
 
-1. The callback (or event in a System.Timers.Timer object) runs on a threadpool context, not the context of the owning object.  The timer has no knowledge of *synchronisation context* .  You must manually switch a UI component callback to run any UI based code.
+1. The callback (or event in a System.Timers.Timer object) runs in a threadpool context, not the context of the owning object.  There's automatic detection and switching to the synchronisation context.  You must manually switch to run any UI based code.
 
 
 
