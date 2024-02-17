@@ -58,11 +58,11 @@ This adds `timer` to the queue and reschedules the native timer callback if the 
 
 ## Takeaways
 
-1. When you "run" a timer there's no black magic.  You add a new timer to the queue and carry on to the next task: fire and forget.  There's nothing happening "in the background" on your current execution thread.  The tracking, management and callbacks are managed by `TimerQueue` running on another thread.
+1. When you "run" a timer there's no black magic.  You add a new timer to the queue and carry on to the next task: fire and forget.  There's nothing happening "in the background" on your execution thread.  The tracking, management and callbacks are managed by `TimerQueue` running on its own thread.
 
 1. You should `Dispose` a timer to remove it from the queue.
 
-1. The callback (or event in a System.Timers.Timer object) runs in a threadpool context, not the context of the owning object.  There's automatic detection and switching to the synchronisation context.  You must manually switch to run any UI based code.
+1. The callback (or event in a System.Timers.Timer object) runs on a threadpool context, not the context of the owning object.  The timer has no knowledge of *synchronisation context* .  You must manually switch a UI component callback to run any UI based code.
 
 
 

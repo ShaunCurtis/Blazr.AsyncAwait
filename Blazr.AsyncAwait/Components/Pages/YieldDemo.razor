@@ -1,0 +1,29 @@
+﻿@page "/"
+@using System.Text
+
+<h3>YieldDemo</h3>
+
+<button class="btn btn-primary" @onclick="this.Step">Run</button>
+
+<div class="bg-dark text-white p-2 m-2">
+    <pre>
+        @_sb.ToString()
+    </pre>
+</div>
+@code {
+    private StringBuilder _sb = new();
+
+    private async Task Step()
+    {
+        _sb.AppendLine("Step1");
+        await BlazrYield.Yield();
+        Thread.Sleep(1000);
+
+        _sb.AppendLine("Step2");
+        StateHasChanged();
+        await BlazrYield.Yield();
+        Thread.Sleep(1000);
+
+        _sb.AppendLine("Complete");
+    }
+}
