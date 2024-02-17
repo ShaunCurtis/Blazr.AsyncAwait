@@ -4,6 +4,9 @@
 <h3>YieldDemo</h3>
 
 <button class="btn btn-primary" @onclick="this.Step">Run</button>
+<button class="btn btn-primary" @onclick="this.StepYield">Run</button>
+<button class="btn btn-primary" @onclick="this.Hello">Hello</button>
+<button class="btn btn-primary" @onclick="this.Yield">Yield</button>
 
 <div class="bg-dark text-white p-2 m-2">
     <pre>
@@ -26,4 +29,86 @@
 
         _sb.AppendLine("Complete");
     }
+
+    private async Task StepYield()
+    {
+        _sb.AppendLine("Step1");
+        await Task.Yield();
+        Thread.Sleep(1000);
+
+        _sb.AppendLine("Step2");
+        StateHasChanged();
+        await Task.Yield();
+        Thread.Sleep(1000);
+
+        _sb.AppendLine("Complete");
+    }
+
+    private async Task Hello1()
+    {
+        _sb.AppendLine("Started");
+        await Task.Delay(1000);
+        _sb.AppendLine("Complete");
+    }
+
+    private Task Hello()
+    {
+        _sb.AppendLine("Started");
+
+        var task = Task.Delay(1000);
+        task.ContinueWith((awaitable) =>
+        {
+            _sb.AppendLine("Complete");
+        });
+
+        return task;
+    }
+
+    private Task Yield()
+    {
+        var stateMachine = new StateMachine(this);
+        stateMachine.MoveNext();
+        return stateMachine.Task;
+    }
+
+    private class StateMachine
+    {
+        private YieldDemo _owner;
+        private TaskCompletionSource _tcs;
+        private int _state;
+
+        public Task Task => _tcs.Task;
+
+        public StateMachine(YieldDemo demo)
+        {
+            _owner = demo;
+            _tcs = new();
+            _state = 0;
+        }
+
+        public void MoveNext()
+        {
+            if (_state == 0)
+            {
+                _owner._sb.AppendLine("Started");
+                _state++;
+                var awaiter = Task.Delay(1000).GetAwaiter();
+
+                if (!awaiter.IsCompleted)
+                {
+                    awaiter.OnCompleted(MoveNext);
+                    return;
+                }
+            }
+
+            if (_state == 1)
+            {
+                _owner._sb.AppendLine("Complete");
+            }
+
+            _tcs.SetResult();
+            return;
+        }
+    }
+
 }

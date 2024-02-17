@@ -8,8 +8,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{ED1E1A3F-EDEC-4D1E-9F7E-EB5FF03EA559}"
 	ProjectSection(SolutionItems) = preProject
 		An-Example.md = An-Example.md
-		Async-Await.md = Async-Await.md
-		Asynchrony.md = Asynchrony.md
 		Awaitable.md = Awaitable.md
 		Blazor-SynchronisationContext.md = Blazor-SynchronisationContext.md
 		Building-A-SynchronisationContext.md = Building-A-SynchronisationContext.md
@@ -17,7 +15,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Delay.md = Delay.md
 		readme.md = readme.md
 		SynchronisationContext.md = SynchronisationContext.md
-		The-Blazor-Context.md = The-Blazor-Context.md
 		Timers.md = Timers.md
 		Yield.md = Yield.md
 	EndProjectSection

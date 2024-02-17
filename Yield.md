@@ -1,6 +1,6 @@
 # Task.Yield
 
-`Task.Yield()` is a mechanism for introducing an async yield into a block of code.  It's purpose is to return a running `Task` to the caller.  This causes the caller code block to yield back to it's caller.  In general this releases the execution context [either the Synchronisation Context or the Threadpool scheduler] to process the next code block in it's queue.
+`Task.Yield()` is a mechanism for introducing an yield into a block of `Async/Await` code.  It's purpose is to return a running `Task` to the caller.  The caller  This causes the caller code block to yield back to it's caller.  In general this releases the execution context [either the Synchronisation Context or the Threadpool scheduler] to process the next code block in it's queue.
 
 It's high level code, abstracting the programmer from the nitty gritty of the *Task Processing Library*.
 
