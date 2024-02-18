@@ -1,12 +1,25 @@
 ﻿@page "/"
+@implements IHandleEvent
 @using System.Text
 @using System.Runtime.CompilerServices
 <h3>YieldDemo</h3>
 
-<button class="btn btn-primary" @onclick="this.Step">Run</button>
-<button class="btn btn-primary" @onclick="this.StepYield">Run</button>
-<button class="btn btn-primary" @onclick="this.Hello">Hello</button>
-<button class="btn btn-primary" @onclick="this.Hello2">Hello 2</button>
+<div class="mb-2">
+    <button class="btn btn-primary" @onclick="this.StandardHandler">Standard Handler</button>
+    <button class="btn btn-primary" @onclick="this.StandardYield">Standard Yield</button>
+    <button class="btn btn-primary" @onclick="this.AlternativeStandardYield">Alernative Standard Yield</button>
+</div>
+
+<div class="mb-2">
+</div>
+
+
+<div class="mb-2">
+</div>
+
+<button class="btn btn-primary" @onclick="this.NormalDelay">Normal Delay</button>
+<button class="btn btn-primary" @onclick="this.ASMContinuationDelay">ATM Continuation Delay</button>
+<button class="btn btn-primary" @onclick="this.ContinuationDelay">Continuation Delay</button>
 <button class="btn btn-primary" @onclick="this.SMYield">Yield</button>
 
 <div class="bg-dark text-white p-2 m-2">
@@ -17,70 +30,140 @@
 @code {
     private StringBuilder _sb = new();
 
-    private async Task Step()
+    #region Normal Handlers
+
+    private async Task StandardHandler()
     {
         _sb.AppendLine("Step1");
-        await BlazrYield.Yield();
-        Thread.Sleep(1000);
+        StateHasChanged();
+        await Task.CompletedTask;
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step2");
         StateHasChanged();
-        await BlazrYield.Yield();
-        Thread.Sleep(1000);
+        await Task.CompletedTask;
+        Thread.Sleep(500);
+
+        _sb.AppendLine("Step3");
+        StateHasChanged();
+        await Task.CompletedTask;
+        Thread.Sleep(500);
 
         _sb.AppendLine("Complete");
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task StandardYield()
+    {
+        _sb.AppendLine("Step1");
+        StateHasChanged();
+        await Task.Yield();
+        Thread.Sleep(500);
+
+        _sb.AppendLine("Step2");
+        StateHasChanged();
+        await Task.Yield();
+        Thread.Sleep(500);
+
+        _sb.AppendLine("Step3");
+        StateHasChanged();
+        await Task.Yield();
+        Thread.Sleep(500);
+
+        _sb.AppendLine("Complete");
+        StateHasChanged();
     }
 
     private YieldAwaitable Yield = Task.Yield();
 
-    private async Task StepYield()
+    private async Task AlternativeStandardYield()
     {
         _sb.AppendLine("Step1");
+        StateHasChanged();
         await Yield;
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step2");
         StateHasChanged();
         await Yield;
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step3");
         StateHasChanged();
         await Yield;
+        Thread.Sleep(500);
 
         _sb.AppendLine("Complete");
+        StateHasChanged();
     }
 
-    private async Task Hello1()
+    #endregion
+
+    //================================
+    //Next Section
+    //===============================
+
+    private async Task NormalDelay()
     {
         _sb.AppendLine("Started");
-        await Task.Delay(1000);
+        StateHasChanged();
+        await Task.Delay(500);
         _sb.AppendLine("Complete");
+        StateHasChanged();
     }
 
-    private Task Hello()
+    private async Task ASMContinuationDelay()
     {
         _sb.AppendLine("Started");
+        StateHasChanged();
 
-        var task = Task.Delay(1000);
-        task.ContinueWith((awaitable) =>
+        var task = Task.CompletedTask;
+
+        await task.ContinueWith((awaitable) =>
         {
+            Thread.Sleep(500);
             _sb.AppendLine("Complete");
         });
 
+        StateHasChanged();
+    }
+
+    private Task ContinuationDelay()
+    {
+        _sb.AppendLine("Started");
+        StateHasChanged();
+        var _sc = SynchronizationContext.Current;
+
+        var task = Task.CompletedTask;
+        task.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        task.ContinueWith((awaitable) =>
+        {
+            _sc?.Post((state) =>
+            {
+                Console.WriteLine($"Continuation Thread:{Thread.CurrentThread.ManagedThreadId}");
+                Console.WriteLine($"Continuation SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null"}");
+                Thread.Sleep(500);
+                _sb.AppendLine("Complete");
+                StateHasChanged();
+            }, null);
+        });
+
+        Console.WriteLine($"After Thread:{Thread.CurrentThread.ManagedThreadId}");
         return task;
     }
 
     private async Task Hello2()
     {
         var task = Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-        Console.WriteLine($"Pre Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null" }");
-        Console.WriteLine($"Pre Wait Thread:{Thread.CurrentThread.ManagedThreadId }");
+        Console.WriteLine($"Pre Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null"}");
+        Console.WriteLine($"Pre Wait Thread:{Thread.CurrentThread.ManagedThreadId}");
         _sb.AppendLine("Started");
         await task;
         Thread.Sleep(1000);
-        Console.WriteLine($"Post Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null" }");
-        Console.WriteLine($"Post Wait Thread:{Thread.CurrentThread.ManagedThreadId }");
+        Console.WriteLine($"Post Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null"}");
+        Console.WriteLine($"Post Wait Thread:{Thread.CurrentThread.ManagedThreadId}");
         _sb.AppendLine("Complete");
         StateHasChanged();
         //return task;
@@ -114,7 +197,7 @@
             {
                 _owner._sb.AppendLine("Started");
                 _state++;
-                var awaiter = Task.Delay(1000).GetAwaiter();
+                var awaiter = Task.Delay(500).GetAwaiter();
 
                 if (!awaiter.IsCompleted)
                 {
@@ -132,5 +215,10 @@
             return;
         }
     }
+
+    // Overrides the ComponentBase handler
+    // removing all the automatic calls to StateHasChanged
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem item, object? arg)
+        => item.InvokeAsync(arg);
 
 }

@@ -1,13 +1,17 @@
 # Task.Yield
 
-`Task.Yield()` is a mechanism for introducing an immediate yield into a block of `Async/Await` code and forcing the scheduling of the continuation on either the *synchronisation context* or the Threadpool.
+`Task.Yield()` is a mechanism for introducing a yield into a block of `Async/Await` code and forcing the scheduling of the continuation on either the *synchronisation context* or the Threadpool.
 
 > There are concepts discussed in this post, such as the `Async State Machine`, that you may be unfamiliar with.  If so I suggest you read the [Understanding Asynchronous Behaviour Post](./Understanding-Asynchronous-Behaviour.md).
 
-Consider this contrived UI event Handler:
+Consider this contrived UI event Handler.  
+
+I've overridden the `IHandleEvent` handler so we manually call `StateHasChanged` where we need to.  There's no hidden functionality happening in the background.  You can see thw calls in the code.
 
 ```csharp
-<button class="btn btn-primary" @onclick="this.StepYield">Yield</button>
+@implements IHandleEvent
+
+<button class="btn btn-primary" @onclick="this.StandardHandler">Standard Handler</button>
 
 <div class="bg-dark text-white p-2 m-2">
     <pre>
@@ -18,87 +22,101 @@ Consider this contrived UI event Handler:
 @code {
     private StringBuilder _sb = new();
 
-    private Task StepYield()
+    private async Task StandardHandler()
     {
         _sb.AppendLine("Step1");
-        Thread.Sleep(1000);
+        StateHasChanged();
+        await Task.CompletedTask;
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step2");
         StateHasChanged();
-        Thread.Sleep(1000);
+        await Task.CompletedTask;
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step3");
         StateHasChanged();
-        Thread.Sleep(1000);
+        await Task.CompletedTask;
+        Thread.Sleep(500);
 
         _sb.AppendLine("Complete");
-
-        return Task.CompletedTask;
+        StateHasChanged();
+        await Task.CompletedTask;
     }
+
+    // Overrides the ComponentBase handler removing all the automatic calls to StateHasChanged
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem item, object? arg)
+        => item.InvokeAsync(arg);
 }
 ```
 
-When you run this code the display doesn't update until the end.  `StepYield` is synchronous code. There's no yielding of control.  The render fragment posted to the *synchronisation context* queue remains queued until `StepYield` completes.
+When you run this code, the display only updates at the end.  It's all synchronous code running sequentially on the *synchronisation context*. There's no yielding of control.  The render fragment posted to the *synchronisation context* queue by `StateHasChanged` remains queued until `StandardHandler` completes.  Call `StateHasChanged` as often as you like, there's no render event until `StandardHandler` completes.
 
-Now introduce `Task.Yield` into the mix:
+> Digression: `StateHasChanged` has a built in mechanism to detect when a render fragment is already queued and abort.   
+
+Now introduce a `Task.Yield` into the mix:
 
 ```csharp
-
-    private async Task StepYield()
+    private async Task StandardYield()
     {
         _sb.AppendLine("Step1");
+        StateHasChanged();
         await Task.Yield();
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step2");
         StateHasChanged();
         await Task.Yield();
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step3");
         StateHasChanged();
         await Task.Yield();
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Complete");
+        StateHasChanged();
     }
 ```
 
 And we see the stepped sequence in the display.
 
-You can even write something like this:
+You can even write something like this.  `Task.Yield()` returns a `YieldAwaitable`, not a `Task`.  This code caches and reuses this object.
 
 ```csharp
     private YieldAwaitable Yield = Task.Yield();
 
-    private async Task StepYield()
+    private async Task AlternativeStandardYield()
     {
         _sb.AppendLine("Step1");
+        StateHasChanged();
         await Yield;
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step2");
         StateHasChanged();
         await Yield;
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Step3");
         StateHasChanged();
         await Yield;
-        Thread.Sleep(1000);
+        Thread.Sleep(500);
 
         _sb.AppendLine("Complete");
+        StateHasChanged();
     }
 ```
 
-Note that `Task.Yield()` returns a `YieldAwaitable`, not a `Task`.  We cache and reuse this object.  
+A `YieldAwaitable` returns a `YieldAwaiter` which has `IsCompleted` set to false, and posts any continuations passed through `OnCompleted` immediately to either the *synchronisation context* or the *threadpool*.
 
-Within the async state machine compiled from this code, each step's awaitable - `Yield` - is not complete, so the step schedules a continuation, and completes.  The RenderFragment queued by calling `StateHasChanged` is now at the front of the queue and run next.  It renders the component, updates the UI, and completes.  The continuation now runs.... and so on.
+In the code `StateHasChanged` queues a render fragment and then `Yield` queues the continuation and completes freeing the *synchronisation context* thread.  The render fragment gets executed [and UI updated] followed by the continuation.
 
-## Building A Yielder
+## Building A Yield Object
 
-We can build our own yielder.  First it needs to implement the *Awaitable* pattern:
+We can build our own yielding object.  
 
+First it must implement the *Awaitable* pattern:
 
 ```csharp
 public class BlazrYield
@@ -107,7 +125,7 @@ public class BlazrYield
         => this;
 ```
 
-And as it returns itself it needs to implement the *awaiter* pattern.
+It returns itself, so must implement the *awaiter* pattern.
 
 ```csharp
 public class BlazrYield : INotifyCompletion
@@ -117,9 +135,9 @@ public class BlazrYield : INotifyCompletion
     public BlazrYield GetAwaiter()
         => this;
 
-    public void OnCompleted(Action continuation) { }
+    public void OnCompleted(Action continuation) {}
 
-    public void GetResult() { }
+    public void GetResult() {}
 }
 ```
 
@@ -129,16 +147,16 @@ public class BlazrYield : INotifyCompletion
     public bool IsCompleted => false;
 ```
 
-We need to capture thw *synchronisation context* which we do during initialization.
+We capture the *synchronisation context* during initialization.
 
 ```csharp
     private SynchronizationContext? _synchronizationContext = SynchronizationContext.Current;
 ```
 
-We need to restrict creation so we only allow a static constructor:
+And restrict creation to a static constructor.
 
 ```csharp
-    private BlazrYield() { }
+    private BlazrYield() {}
 
     public static BlazrYield Yield()
     {
@@ -148,9 +166,9 @@ We need to restrict creation so we only allow a static constructor:
 }
 ```
 
-Finally we code `OnCompleted`.  This is the method called to add a continuation to the *awaiter*.  Normally this would add the provided `Action` to a internal queue for executing when the process behind the *awaiter* completes.  However, here we schedule the continuation immediately.
+Finally we code `OnCompleted`.  This method is called to add a continuation to the *awaiter*.  Normally this would add the provided `Action` to a internal queue for executing when the process behind the *awaiter* completes.  However, here it's scheduled immediately.
 
-The code checks to see if we have a saved *synchronisation context*.  If we do we create a `SendOrPostCallback` delegate and post it.  If not we create a `WaitCallback` and post it to the Threadpool queue.
+The code checks to see for a saved *synchronisation context*.  If true it creates a `SendOrPostCallback` delegate and posts it.  If not it creates a `WaitCallback` delegate and posts it to the threadpool queue.
 
 ```csharp
     public void OnCompleted(Action continuation)
@@ -186,10 +204,10 @@ public class BlazrYield : INotifyCompletion
 
     private SynchronizationContext? _synchronizationContext = SynchronizationContext.Current;
 
-    private BlazrYield() { }
+    private BlazrYield() {}
 
     public BlazrYield GetAwaiter()
-        =>  return this;
+        => this;
 
     public void OnCompleted(Action continuation)
     {
@@ -214,7 +232,7 @@ public class BlazrYield : INotifyCompletion
         }
     }
 
-    public void GetResult() { }
+    public void GetResult() {}
 
     public static BlazrYield Yield()
     {
@@ -228,56 +246,9 @@ public class BlazrYield : INotifyCompletion
 
 Net8 introduced some new versions of the `Task.ConfigureAwait` method.  You can now provide a `ConfigureAwaitOptions` Enum flag. 
 
-If you wrote something like:
+We can replace our code above with the following:
 
 ```csharp
-await Task.CompletedTask.ContinueWith((awaitable) => {_sb.AppendLine("Complete"); });
-```
-
-The continuation would be executed synchronously as part of the current code block running on the *synchronisation context*.  There would be no yield at the await.
-
-You can now write:
-
-```csharp
-    private Task Clicked()
-    {
-        var task = Task.CompletedTask;
-        _sb.AppendLine("Started");
-
-        task.ContinueWith((awaitable) =>
-        {
-            Thread.Sleep(1000);
-            _sb.AppendLine("Complete");
-        })
-        .ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-
-        return task;
-    }
-```
-
-Which runs, but doesn't update the log for "Complete". Why?  We've now sc
-
-```csharp
-    private Task Clicked()
-    {
-        var task = Task.CompletedTask;
-        _sb.AppendLine("Started");
-
-        task.ContinueWith((awaitable) =>
-        {
-            Thread.Sleep(1000);
-            _sb.AppendLine("Complete");
-            StateHasChanged();
-        })
-        .ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-
-        return task;
-    }
-```
-
-
-
-```csharp
-await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+await MyTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 ```
 

@@ -8,12 +8,10 @@ public class BlazrYield : INotifyCompletion
 
     private SynchronizationContext? _synchronizationContext = SynchronizationContext.Current;
 
-    private BlazrYield() { }
+    private BlazrYield() {}
 
     public BlazrYield GetAwaiter()
-    {
-        return this;
-    }
+        => this;
 
     public void OnCompleted(Action continuation)
     {
@@ -38,8 +36,7 @@ public class BlazrYield : INotifyCompletion
         }
     }
 
-    public void GetResult()
-    { }
+    public void GetResult() {}
 
     public static BlazrYield Yield()
     {
