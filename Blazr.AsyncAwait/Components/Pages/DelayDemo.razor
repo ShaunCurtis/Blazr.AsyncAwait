@@ -1,0 +1,43 @@
+﻿@page "/"
+@implements IHandleEvent
+@using System.Text
+@using System.Runtime.CompilerServices
+<h3>Delay Demo</h3>
+
+<div class="mb-2">
+    <button class="btn btn-primary" @onclick="this.StandardHandler">Standard Handler</button>
+</div>
+
+<div class="bg-dark text-white p-2 m-2">
+    <pre>
+        @_sb.ToString()
+    </pre>
+</div>
+@code {
+    private StringBuilder _sb = new();
+
+    private async Task StandardHandler()
+    {
+        _sb.AppendLine("Step1");
+        StateHasChanged();
+        await BlazrDelay.Delay(500);
+
+        _sb.AppendLine("Step2");
+        StateHasChanged();
+        await BlazrDelay.Delay(500);
+
+        _sb.AppendLine("Step3");
+        StateHasChanged();
+        await BlazrDelay.Delay(500);
+
+        _sb.AppendLine("Complete");
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    // Overrides the ComponentBase handler
+    // removing all the automatic calls to StateHasChanged
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem item, object? arg)
+        => item.InvokeAsync(arg);
+
+}

@@ -1,4 +1,4 @@
-﻿@page "/"
+﻿@page "/delay"
 @implements IHandleEvent
 @using System.Text
 @using System.Runtime.CompilerServices
@@ -7,7 +7,7 @@
 <div class="mb-2">
     <button class="btn btn-primary" @onclick="this.StandardHandler">Standard Handler</button>
     <button class="btn btn-primary" @onclick="this.StandardYield">Standard Yield</button>
-    <button class="btn btn-primary" @onclick="this.AlternativeStandardYield">Alernative Standard Yield</button>
+    <button class="btn btn-primary" @onclick="this.AlternativeStandardYield">Alternative Standard Yield</button>
 </div>
 
 <div class="mb-2">
@@ -136,37 +136,18 @@
         var _sc = SynchronizationContext.Current;
 
         var task = Task.CompletedTask;
-        task.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         task.ContinueWith((awaitable) =>
         {
             _sc?.Post((state) =>
             {
-                Console.WriteLine($"Continuation Thread:{Thread.CurrentThread.ManagedThreadId}");
-                Console.WriteLine($"Continuation SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null"}");
                 Thread.Sleep(500);
                 _sb.AppendLine("Complete");
                 StateHasChanged();
             }, null);
         });
 
-        Console.WriteLine($"After Thread:{Thread.CurrentThread.ManagedThreadId}");
         return task;
-    }
-
-    private async Task Hello2()
-    {
-        var task = Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-        Console.WriteLine($"Pre Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null"}");
-        Console.WriteLine($"Pre Wait Thread:{Thread.CurrentThread.ManagedThreadId}");
-        _sb.AppendLine("Started");
-        await task;
-        Thread.Sleep(1000);
-        Console.WriteLine($"Post Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null"}");
-        Console.WriteLine($"Post Wait Thread:{Thread.CurrentThread.ManagedThreadId}");
-        _sb.AppendLine("Complete");
-        StateHasChanged();
-        //return task;
     }
 
     private Task SMYield()
@@ -196,6 +177,7 @@
             if (_state == 0)
             {
                 _owner._sb.AppendLine("Started");
+                _owner.StateHasChanged();
                 _state++;
                 var awaiter = Task.Delay(500).GetAwaiter();
 
@@ -209,6 +191,7 @@
             if (_state == 1)
             {
                 _owner._sb.AppendLine("Complete");
+                _owner.StateHasChanged();
             }
 
             _tcs.SetResult();
