@@ -6,6 +6,7 @@
 <button class="btn btn-primary" @onclick="this.Step">Run</button>
 <button class="btn btn-primary" @onclick="this.StepYield">Run</button>
 <button class="btn btn-primary" @onclick="this.Hello">Hello</button>
+<button class="btn btn-primary" @onclick="this.Hello2">Hello 2</button>
 <button class="btn btn-primary" @onclick="this.SMYield">Yield</button>
 
 <div class="bg-dark text-white p-2 m-2">
@@ -46,7 +47,6 @@
         _sb.AppendLine("Step3");
         StateHasChanged();
         await Yield;
-        Thread.Sleep(1000);
 
         _sb.AppendLine("Complete");
     }
@@ -69,6 +69,21 @@
         });
 
         return task;
+    }
+
+    private async Task Hello2()
+    {
+        var task = Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+        Console.WriteLine($"Pre Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null" }");
+        Console.WriteLine($"Pre Wait Thread:{Thread.CurrentThread.ManagedThreadId }");
+        _sb.AppendLine("Started");
+        await task;
+        Thread.Sleep(1000);
+        Console.WriteLine($"Post Wait SC:{SynchronizationContext.Current?.GetHashCode().ToString() ?? "Null" }");
+        Console.WriteLine($"Post Wait Thread:{Thread.CurrentThread.ManagedThreadId }");
+        _sb.AppendLine("Complete");
+        StateHasChanged();
+        //return task;
     }
 
     private Task SMYield()
