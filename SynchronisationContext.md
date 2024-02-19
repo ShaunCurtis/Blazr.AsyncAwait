@@ -1,13 +1,13 @@
-# Synchronisation Context
+# The Async Series - Synchronisation Contexts
 
 ## A Little History
 
-Applications originally ran on one thread.  Work blocked the thread while they executed.  UIs were unresponsive. 
+Applications originally ran on one thread.  Work blocked that thread while they executed.  UIs were unresponsive. 
 
 Multithreading came along. Work could be shifted to other threads and the UI kept responsive.  This new functionality came at a price.  Three important issues are:
 
-1. You needed a framework to manage the threading environment.   
-2. Objects passed around as part of work needed to be thread safe.
+1. You need a framework to manage the threading environment.   
+2. Objects passed around as part of work need to be thread safe.
 3. You need a way to manage UI activity.
 
 Two examples to illustrate these issues:
@@ -16,7 +16,7 @@ You have a `StringBuilder` instance that you're using as a log for some work.  I
 
 Two blocks of work on the UI attempt to update the UI at the same time.  Will the UI handle this gracefully?  Often not.
 
-To solve this problem, various frameworks (such as Windows Forms) provided thread management.  The problem was that different frameworks did it differently, so writing generic libraries for the different was problematic. 
+To solve this problem, various frameworks (such as Windows Forms) provided thread management.  The problem was that different frameworks did it differently, so writing generic libraries for the different implementations was problematic. 
 
 The **Synchronisation Context** was created to abstract the developer from the underlying implementation.  Each framework has it's own implementation of `SynchronisationContext`, but they all implement the base `SynchronisationContext` functionality.  And there's a common way to get the current `SynchronisationContext`.
 
@@ -28,7 +28,7 @@ The constructor looks like this.  A standalone object: nothing needed to get an 
 SynchronizationContext()
 ```
 
-It has a static nullable `Current` property, which returns the SC for the current thread.  That tells us a `Thread` object may have an SC attached to it, but as the return value is nullable, it also may be null.
+It has a static nullable `Current` property, which returns the SC for the current thread.  That tells us a `Thread` object may have an SC attached to it, but as the return value is nullable, it also may not.
 
 ```csharp
 //Gets the synchronization context for the current thread.

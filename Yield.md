@@ -1,4 +1,4 @@
-# Task.Yield
+# The Async Series - Task.Yield
 
 `Task.Yield()` is a mechanism for introducing a yield into a block of `Async/Await` code and forcing the scheduling of the continuation on either the *synchronisation context* or the Threadpool.
 
