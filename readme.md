@@ -1,7 +1,8 @@
-# The Asynchronous World
+# The Async Series
+
+This repository contains a series of articles describing many of the important aspects of asynchronous behaviour.
 
 
-There are several short articles:
 
 1. [Understanding Asynchronous Behaviour](./Understanding-Asynchronous-Behaviour.md)
 1. [Awaitable](./Awaitable.md)

@@ -1,8 +1,6 @@
-# Awaitable
+# The Async Series - Awaitables and Awaiters
 
-Throughout these discussions I use the term *Threading Context* to describe the environment DotNetCore builds on the operating system threading infrastructure.  This is normally either a `Synchronisation Context` or the `Threadpool`.  
-
-The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` can be awaited by the *TPL*. 
+The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` can be awaited by the *Async/Await*. 
 
 I'll use the following terms:
 

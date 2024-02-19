@@ -2,11 +2,11 @@
 
 `Task.Delay(x)` provides a mechanism for introducing an asynchronous yielding delay into a block of code.  
 
-It's returns a running awaitable `Task` which completes when the timer expires.  The continuation will run on either the Synchronisation Context or the Threadpool scheduler, depending on the `ConfigureAwait` setup.
+It returns a running awaitable`Task` [Completed = `false`]  which completes when the timer expires.  The continuation runs either on the Synchronisation Context or the Threadpool scheduler, depending on the `ConfigureAwait` setup.
 
-In Blazor we often use it to either emulate an async task in testing or demos, or to yield control during a synchronous block of code to display progress.
+In Blazor we often use it to emulate an async task in testing or demos, or to yield control during a synchronous block of code to display progress.
 
-In this article we'll build our own delay mechanism to demonstrate how it works
+In this article I'll build a delay class to demonstrate how it works
 
 Here's a simple home page with a button to emulate asynchronous activity such as a database call.
 
@@ -39,7 +39,7 @@ Welcome to your new app.
 }
 ```
 
-First the *Awatable* and *Awaiter* pattern implementations.  Note the single static constructor setting up the delay period.
+First We need to implement the *Awatable* and *Awaiter* pattern.  Only objects that return an *Awaiter* can be awaited.  This implementation uses a single static constructor.
 
 ```csharp
 using System.Runtime.CompilerServices;
@@ -61,11 +61,11 @@ public class BlazrDelay : INotifyCompletion
 }
 ```
 
-Next:
-1. Caching the *synchronisation context* on initialization.
-2. Defining an internal `Queue` to hold any posted continuations.  We need to allow for more that one, and a queue is the simplest way to implement this.
-3. A private `System.Threading.Timer` which is setup and started on initialization.
-4. The Callback for the timer which sets the *awaiter* to complete, disposes the timer and schedules the completions.
+Next we:
+1. Cache the *synchronisation context* on initialization.
+2. Set up an internal `Queue` to hold any posted continuations.
+3. Define a private `System.Threading.Timer` which is started on initialization.
+4. A Callback for the timer which sets the *awaiter* to complete, disposes the timer and schedules the completions.
 
 ```csharp
     private volatile SynchronizationContext? _synchronizationContext = SynchronizationContext.Current;
@@ -85,7 +85,7 @@ Next:
     }
 ```
 
-Next, `OnCompleted`.  This is called to add a completion to the *awaiter*.  It calls `ScheduleContinuationsIfCompleted` because you can add a completion to an *awaiter* after it has completed.  Note that it will be scheduled immediately.
+5. Define `OnCompleted`: the *awaiter* method called to add a completion to the *awaiter*.  Completions can be added at any time, including after `IsCompleted` is set to `true`.  `ScheduleContinuationsIfCompleted` will post any completion immediately if the *awaiter* has completed.
 
 ```csharp
     public void OnCompleted(Action continuation)
@@ -95,7 +95,7 @@ Next, `OnCompleted`.  This is called to add a completion to the *awaiter*.  It c
     }
 ```
 
-Finally `ScheduleContinuationsIfCompleted`.  It early exits if called before the background process has set the *awaiter* to completed.  It checks the cached *synchonisation Context* state and if one exits it posts the continuations to it.  Otherwise, it posts the continuations to the threadpool dispatcher.
+Finally `ScheduleContinuationsIfCompleted`.  It exits early if called before the background process has set the *awaiter* to completed.  It checks the cached *synchonisation Context* state and if one exits it posts the continuations to it.  Otherwise, it posts the continuations to the threadpool dispatcher.
 
 ```csharp
      private void ScheduleContinuationsIfCompleted()
@@ -118,12 +118,12 @@ Finally `ScheduleContinuationsIfCompleted`.  It early exits if called before the
 
 Some Important points:
 
-Timers are *posted* to the timer queue when they are created.  The Timer loop that services this queue is running on a background thread. The Timer service, running on another thread, has responsibility for calling the callback when the timer expires.
+Timers are *posted* to the timer queue when they are created.  The Timer loop that services this queue runs on a background thread. The Timer service has responsibility for calling the callback when the timer expires.
  
 The static `Delay` creates and instance of `BlazrDelay` with a timer queued on the timer queue, returns the new instance of itself and completes.  The thread, in our case the *synchonisation context*, is free to run any queued work.
 
-When the timer expires the timer loop schedules the callback on a threadpool thread.  It's a background singleton service with no concept of a user context *synchonisation context*.
+When the timer expires, the timer loop schedules the callback on a threadpool thread.  It's a background singleton service with no concept of a user context *synchonisation context*.
 
-The callback calls `ScheduleContinuationsIfCompleted`.  It's does know about a *synchonisation context* and schedules the actual continuations on the context if one exists, or executes it on the current thread if there's no context.
+The callback calls `ScheduleContinuationsIfCompleted` which does know about a *synchonisation context*.  It schedules the actual continuations on the context if one exists, or executes it on the current thread if there's no context.
 
 This is demonstration code only.  Error checking, exception handling and edge case scenarios are not covered.  Use `Task.Delay` in production.  
