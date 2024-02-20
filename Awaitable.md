@@ -1,13 +1,17 @@
 # The Async Series - Awaitables and Awaiters
 
-The core functionality of async behaviour is the implementation of `GetAwaiter`.  Any object implementing a `GetAwaiter` can be awaited by the *Async/Await*. 
+The Await of *Async/Await* needs something to await.  Any method that is awaited need to be *awaitable*. Task Parallel programming defines an *awaitable* pattern.
 
-I'll use the following terms:
+```csharp
+public object Awaitable
+{
+    public Awaiter GetAWaiter();;
+}
+```
 
- - An *Awaitable* is an object that executes some form of asynchronous behaviour and implements a `GetAwaiter` method. 
- - An *Awaiter* is an object returned by `GetAwaiter`.
+Very informative!  What's an *Awaiter*?
 
-An *Awaiter* must implement the following functionality:
+Another pattern:tion.
 
 ```csharp
 public struct MyAwaiter : INotifyCompletion
@@ -18,13 +22,18 @@ public struct MyAwaiter : INotifyCompletion
 }
 ```
 
-The awaiter provides: 
+ It provides: 
 
-1. A bool property to detect if the awaitable is complete.
-2. A method to post a continuation to be run when the awaitable is complete.
+1. A bool property [normally set as readonly] to check if the awaitable is complete.
+2. A method to post continuations to be run when the awaitable is complete.
 3. A method to get the result on completion.
 
-`Task` in it's various guises implements this functionality.  It's `GetAwaiter` returns itself.
+We can summarise as:
+
+ - An *Awaitable* is an object that executes some form of asynchronous behaviour and implements a `GetAwaiter` method. 
+ - An *Awaiter* is an object returned by `GetAwaiter`.
+
+`Task`, in it's various guises, implements this functionality.  It's `GetAwaiter` returns itself.
 
 ## Code and Repo
 
