@@ -18,7 +18,7 @@ public struct MyAwaiter : INotifyCompletion
 }
 ```
 
-The awaiter providea: 
+The awaiter provides: 
 
 1. A bool property to detect if the awaitable is complete.
 2. A method to post a continuation to be run when the awaitable is complete.
