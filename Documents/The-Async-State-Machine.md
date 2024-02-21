@@ -2,12 +2,12 @@
 
 *Async/Await* is high level syntatic sugar: an instruction to the compiler to refactor the method into an *Async State Machine*.
 
-A *Async/Await* method is refactored into:
+*Async/Await* methods are refactored into:
 
 1. A private *async state machine* object within the parent class.
 1. A refactored `MethodAsync` to configure and start the state machine.
 
-In this document I'll build a demo state machine using the same patterns and primitives used by the compiler, but hopefully a lot more legible.  Armed with this knowledge, you should be able to pick appart and understand how the real code works. 
+In this document I'll build a demonstration state machine using the same patterns and primitives used by the compiler.  Hopefully it will be a lot more legible than the real thing.  Armed with this knowledge, you should be able to pick apart and understand how the real code works. 
 
 ## Our Async/Await Code
 
@@ -54,15 +54,15 @@ private class AsyncStateMachine :IAsyncStateMachine
 }
 ```
 
-`AsyncTaskMethodBuilder` provides and generates a lot of the boiler plate code.  It maintains the `Task` that represents the running state of the state machine.
+`AsyncTaskMethodBuilder` provides a lot of the boiler plate functionality.  It maintains the `Task`  representing the running state of the state machine.
 
-The class implements the `IAsyncStateMachine` interface.  It's a requirement of the `AsyncTaskMethodBuilder`.
+The class implements the `IAsyncStateMachine` interface: it's a requirement of `AsyncTaskMethodBuilder`.
 
 State is tracked using a simple integer.  
  - `-1` is the intitial state.  
  - `-2` is completed.  
 
-`SetStateMachine` is required by the interface.  It's not used so implemented as an empty method.
+`SetStateMachine` is required by the interface but bot used.  It's implemented as an empty method.
 
 `MoveNext` is the method called to start and run the state machine.  We'll look at it's implementation next.
 
@@ -91,7 +91,7 @@ The last step executes the *await* instruction, gets the returned *awaiter* and 
 
 If:
 
- - The *awaiter* is not completed, the background process yielded and is still running on a background thread.  We need to wait for it to complete before moving on the next step.  We do that by adding a continuation to the awaiter to call this method when it completes.  We, this execution thread, are done, so we return to the caller.  `IsCompleted` on our public `Task` is `false`.
+ - The *awaiter* is not completed, the background process yielded and is still running on a background thread.  We need to wait for it to complete before moving on the next step.  We do that by adding a continuation to the awaiter to call this method when it completes.  We, this execution thread, are done. We return to the caller.
 
  - The *awaiter* is completed.  The background process ran to completion. We can safely get the result. There's no requirment for a continuation: move on synchronously to the next step.      
 
@@ -179,23 +179,23 @@ The calling method gets refactored into:
     return stateMachine.Builder.Task;
 ```
 
-It creates a new instance of the state machine and sets the Builder instance on the state machine.  It sets the state and then starts the builder.  This makes the first call to `MoveNext`.
+It creates a new instance of the state machine and sets the Builder instance on the state machine.  It sets the state and starts the builder which makes the first call to `MoveNext`.
 
 The method returns the Builder's Task when the state machine returns, either because a state yielded, or the state machine completed.
 
 ### The Continuation Context
 
-The context in which continuations are run is the responsibility of the background process behind the awaiter.  The state machine posts the continuation to the awaiter, but there's no built in mechanism within the *awaiter* pattern to provide direction.
+The context in which continuations run is the responsibility of the background process.  The state machine posts the continuation to the awaiter, but there's no built in mechanism within the *awaiter* pattern to provide direction.
 
-Task based *awaiters* add some extra functionality in `ConfigureAwait`.  Most async processes honour the information provided by the `ConfiguredTaskAwaiter`.
+Task based *awaiters* add extra information through `ConfigureAwait`.  Most async processes honour the information provided.
 
-If a background process has captured a *synchronisation context* when it started it will run the continuation on that context if the awaiter is configured by `ContinueWith` to do so.  Otherwise, the continuation will be scheduled to run on the threadpool.
+Background processes normally capture the *synchronisation context* when they start.  They run the continuation on the context or the threadpool depending on the configuration of the `ConfiguredTaskAwaiter` *awaiter* returned by `ContinueWith`.
 
 > This topic is covered in more detail in the [Awaitable document](./Awaitable.md).
 
 ## The Compiler Generated State Machine
 
-First note:
+Note:
 
 1. The code is optimized for a sequential synchronous operation.  No yields.
 2. The code is not generated for humans consumption.
