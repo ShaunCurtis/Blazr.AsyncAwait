@@ -1,8 +1,17 @@
 # The Async Series - The Async State Machine
 
-*Async/Await* uses the *Async State Machine* to implement asynchronous behaviour.
+*Async/Await* is high level syntatic sugar: an instruction to the compiler to refactor the method into an *Async State Machine*.
 
-This high level code:
+A *Async/Await* method is refactored into:
+
+1. A private *async state machine* object within the parent class.
+1. A refactored `MethodAsync` to configure and start the state machine.
+
+In this document I'll build a demo state machine using the same patterns and primitives used by the compiler, but hopefully a lot more legible.  Armed with this knowledge, you should be able to pick appart and understand how the real code works. 
+
+## Our Async/Await Code
+
+This is the high level code we'll transform.
 
 ```csharp
 string message = "Idle";
@@ -26,16 +35,11 @@ public async Task MethodAsync()
 }
 ```
 
-Is refactored by the compiler into:
-
-1. An async state machine object within the parent class.
-1. A refactored `MethodAsync` to configure and start the state machine.
-
-In this document I'll build a state machine, similar to that built by the compiler, to demonstrate the functionality *Async/Await* builds. 
-
 ## The State Machine
 
-The state machine skeleton looks like this.
+### The Skeleton
+
+The skeleton looks like this.
 
 ```csharp
 private class AsyncStateMachine :IAsyncStateMachine
@@ -44,29 +48,27 @@ private class AsyncStateMachine :IAsyncStateMachine
     public MyClass Parent = new();
     public int State = -2;
 
-   public void SetStateMachine(IAsyncStateMachine stateMachine) { }
+   public void SetStateMachine(IAsyncStateMachine stateMachine) {}
 
     public void MoveNext() {}
 }
 ```
 
-It has:
+`AsyncTaskMethodBuilder` provides and generates a lot of the boiler plate code.  It maintains the `Task` that represents the running state of the state machine.
 
-   1. Implements the `IAsyncStateMachine` interface.
-   2. Creates a `AsyncTaskMethodBuilder` instance.
-   3. Uses an integer to maintain state.
-   4. Has a `MoveNext` method to execute the current step and increment the state.
-   1. `SetStateMachine` is part of the `IAsyncStateMachine` interface.
+The class implements the `IAsyncStateMachine` interface.  It's a requirement of the `AsyncTaskMethodBuilder`.
 
-The compiler breaks the original code into steps, split on each `await`.  Each step is given a state number and at the end of each step the await statement is executed and tested for completion.
+State is tracked using a simple integer.  
+ - `-1` is the intitial state.  
+ - `-2` is completed.  
 
-THe state machine uses more primitive *TPL* functionality.  It gets the awaiter for the async method, and adds continuations using the *awaiter* pattern method `OnCompleted`.
+`SetStateMachine` is required by the interface.  It's not used so implemented as an empty method.
 
-If:
+`MoveNext` is the method called to start and run the state machine.  We'll look at it's implementation next.
 
- - The async method returns an incomplete awaiter, it's yielded.  Add a continuation to the awaiter to call this method and exit.
+### States 
 
- - The async method runs to completion and returns a completed awaiter, `goto` the next state step.  Don't create a continuation, just continue synchronous execution of the code on the same thread.      
+The compiler breaks the original method into steps, split on `await`.  Each step is given a state number.  The basic template looks like this.
 
 ```csharp
 case x:
@@ -85,6 +87,13 @@ case x:
     goto case next;
 }
 ```
+The last step executes the *await* instruction, gets the returned *awaiter* and tests for completion.
+
+If:
+
+ - The *awaiter* is not completed, the background process yielded and is still running on a background thread.  We need to wait for it to complete before moving on the next step.  We do that by adding a continuation to the awaiter to call this method when it completes.  We, this execution thread, are done, so we return to the caller.  `IsCompleted` on our public `Task` is `false`.
+
+ - The *awaiter* is completed.  The background process ran to completion. We can safely get the result. There's no requirment for a continuation: move on synchronously to the next step.      
 
 The full `NextStep` looks like this:
 
@@ -152,7 +161,10 @@ public void MoveNext()
 }
 ```
 
-The calling method looks like this:
+
+### The Original Method
+
+The calling method gets refactored into:
 
 ```csharp
     // Set up the state machine and Task builder
@@ -167,21 +179,31 @@ The calling method looks like this:
     return stateMachine.Builder.Task;
 ```
 
-If the step's async call returns an incomplete task, `MoveNext` queues a continuation on the awaiter to call itself and exits.  It returns control to the caller. Executing the next state is no longer the responsibility of the current executing code.  Restarting `MoveNext` at the next step is the responsibility of background process behind the awaiter.  Where that gets posted and executed is the responsibility of the *awaiter* and it's backing process.  Task based *awaiters* use the `ConfigureAwait` settings to determine the context on which to post the continuation.
+It creates a new instance of the state machine and sets the Builder instance on the state machine.  It sets the state and then starts the builder.  This makes the first call to `MoveNext`.
 
-Execution steps through each state until it reaches the final step.  It has no awaiter.  It breaks from the switch, sets the `AsyncTaskMethodBuilder` to complete and exists.
+The method returns the Builder's Task when the state machine returns, either because a state yielded, or the state machine completed.
+
+### The Continuation Context
+
+The context in which continuations are run is the responsibility of the background process behind the awaiter.  The state machine posts the continuation to the awaiter, but there's no built in mechanism within the *awaiter* pattern to provide direction.
+
+Task based *awaiters* add some extra functionality in `ConfigureAwait`.  Most async processes honour the information provided by the `ConfiguredTaskAwaiter`.
+
+If a background process has captured a *synchronisation context* when it started it will run the continuation on that context if the awaiter is configured by `ContinueWith` to do so.  Otherwise, the continuation will be scheduled to run on the threadpool.
+
+> This topic is covered in more detail in the [Awaitable document](./Awaitable.md).
 
 ## The Compiler Generated State Machine
 
-First:
+First note:
 
 1. The code is optimized for a sequential synchronous operation.  No yields.
-2. The code is not written for humans to read.
-3. The compiler applies naming conventions that use characters illegal in human generated code to  ensure there are no name conflicts.
-4. THe compiler switches from an `if` driven `MoveNext` to a `switch` driven version when there are more than 2 steps.
+2. The code is not generated for humans consumption.
+3. The compiler uses characters illegal in human generated code to ensure no naming conflicts.
+4. The compiler switches from an `if` driven `MoveNext` to a `switch` driven version when there are more than 2 steps.
 5. `MoveNext` looks back-to-front because it's generated from the end backwards.
 6. A state machine is compiled as a class in debug mode and a struct in release mode.
-7. The code may seem a little clunking and in need of refactoring, but it's generated by a builder to a  pescription.  And designed for speed not elegance.
+7. The code looks clucky and breaks best practices.  It's generated by a builder to a formula.  It uses builders to provide a lot of boilerplate functionality.  It's optimized for speed not elegance.
 
 The compiler generated code is shown below.  You should now be able to unpick it and understand what it's doing.
 

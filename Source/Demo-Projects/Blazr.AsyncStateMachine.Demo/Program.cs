@@ -52,7 +52,9 @@ class MyClass
                 case 0:
                     Console.WriteLine("Step 2");
                     this.Parent.message = "Step 2";
+
                     awaiter = Task.Delay(600).GetAwaiter();
+                    var _awaiter = Task.Delay(600).ConfigureAwait(ConfigureAwaitOptions.None).GetAwaiter();
 
                     if (awaiter.IsCompleted == false)
                     {
