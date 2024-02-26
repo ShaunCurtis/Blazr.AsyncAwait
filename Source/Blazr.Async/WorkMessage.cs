@@ -1,4 +1,4 @@
-﻿namespace Blazr.SyncronisationContext;
+﻿namespace Blazr.Async;
 
 public readonly record struct WorkMessage
 {

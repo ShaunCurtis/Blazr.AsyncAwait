@@ -7,9 +7,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\..\Blazr.SyncronisationContext\Blazr.SyncronisationContext.csproj" />
-		<ProjectReference Include="..\Blazr.AsyncAwait\Blazr.AsyncAwait.csproj" />
-	</ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Blazr.Async\Blazr.Async.csproj" />
+  </ItemGroup>
 
 </Project>

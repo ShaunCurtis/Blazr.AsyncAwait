@@ -1,5 +1,4 @@
-﻿using Blazr.AsyncAwait.Async;
-using Blazr.SyncronisationContext;
+﻿using Blazr.Async;
 
 var sc = new BlazrSynchronisationContext();
 SynchronizationContext.SetSynchronizationContext(sc);

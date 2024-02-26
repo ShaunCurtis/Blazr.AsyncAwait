@@ -1,5 +1,4 @@
-﻿using Blazr.SyncronisationContext;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace Blazr.Async;
 

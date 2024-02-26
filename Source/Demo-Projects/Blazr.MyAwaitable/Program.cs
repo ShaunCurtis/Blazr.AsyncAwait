@@ -1,71 +1,19 @@
-﻿using Blazr.SyncronisationContext;
+﻿using Blazr.Async;
 using System.Runtime.CompilerServices;
 
-//var sc = new BlazrSynchronisationContext();
-var sc = new MySynchronizationContext();
-SynchronizationContext.SetSynchronizationContext(sc);
 
-
-var awaitable = new BabyAwaitable(false);
-
-var timer = new Timer(_ => awaitable.Finish(), null, 3000, -1);
-
-var result = await awaitable;
-
-Utilities.WriteToConsole($"{result}");
-
-Utilities.WriteToConsole($"Main Complete");
-
+Utilities.WriteToConsole($"Main started - click to continue");
 
 Console.ReadLine();
 
-//===========================================
+//var task = Task.Run(() => {
+//    Utilities.WriteToConsole($"Scheduled Task");
+//});
 
-public class BabyAwaitable
-{
-    private volatile bool finished;
-    public bool IsFinished => finished;
-    public BabyAwaitable(bool finished) => this.finished = finished;
-    public void Finish()
-    {
-        Utilities.WriteToConsole("Finish Set");
-        finished = true;
-    }
-    public BabyAwaiter GetAwaiter() => new BabyAwaiter(this);
-}
+var task = Task.CompletedTask;
 
-public class BabyAwaiter : INotifyCompletion
-{
-    private readonly BabyAwaitable awaitable;
-    private readonly SynchronizationContext? capturedContext = SynchronizationContext.Current;
 
-    public BabyAwaiter(BabyAwaitable awaitable)
-        => this.awaitable = awaitable;
+task.Start();
 
-    public bool IsCompleted => awaitable.IsFinished;
 
-    public int GetResult()
-    {
-        Utilities.WriteToConsole("Get Result Spinning");
-        SpinWait.SpinUntil(() => awaitable.IsFinished);
-        Utilities.WriteToConsole("Get Result complete");
-        return new Random().Next();
-    }
-
-    public void OnCompleted(Action continuation)
-    {
-        //SpinWait.SpinUntil(() => awaitable.IsFinished);
-        Utilities.WriteToConsole("OnCompleted");
-        if (capturedContext != null) capturedContext.Post(state => continuation(), null);
-        else continuation();
-    }
-}
-
-public class MySynchronizationContext : SynchronizationContext
-{
-    public override void Post(SendOrPostCallback d, object? state)
-    {
-        Utilities.WriteToConsole("Posted to synchronization context");
-        d(state);
-    }
-}
+Utilities.WriteToConsole($"Main Complete");

@@ -25,8 +25,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documents", "Documents", "{
 		Documents\Yield.md = Documents\Yield.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.SyncronisationContext", "Source\Blazr.SyncronisationContext\Blazr.SyncronisationContext.csproj", "{3C57A252-979A-4051-8D88-E42E232B7A63}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.Async", "Source\Blazr.Async\Blazr.Async.csproj", "{08F6A1A4-8000-4DBD-BE09-63C00CD7DD7B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.AsyncStateMachine.Demo", "Source\Demo-Projects\Blazr.AsyncStateMachine.Demo\Blazr.AsyncStateMachine.Demo.csproj", "{EE151B98-444F-4C59-ABC0-4975070B7C16}"
@@ -47,10 +45,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3C57A252-979A-4051-8D88-E42E232B7A63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3C57A252-979A-4051-8D88-E42E232B7A63}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3C57A252-979A-4051-8D88-E42E232B7A63}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3C57A252-979A-4051-8D88-E42E232B7A63}.Release|Any CPU.Build.0 = Release|Any CPU
 		{08F6A1A4-8000-4DBD-BE09-63C00CD7DD7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{08F6A1A4-8000-4DBD-BE09-63C00CD7DD7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{08F6A1A4-8000-4DBD-BE09-63C00CD7DD7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -85,7 +79,6 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{6FCF9563-2C4A-4E06-AFD5-9527F9AB66F2} = {99AF4B1A-9D85-4843-B039-5C786C11845F}
-		{3C57A252-979A-4051-8D88-E42E232B7A63} = {99AF4B1A-9D85-4843-B039-5C786C11845F}
 		{08F6A1A4-8000-4DBD-BE09-63C00CD7DD7B} = {99AF4B1A-9D85-4843-B039-5C786C11845F}
 		{EE151B98-444F-4C59-ABC0-4975070B7C16} = {6FCF9563-2C4A-4E06-AFD5-9527F9AB66F2}
 		{D6A3F1BE-4802-4048-BE9E-E538F40431AE} = {6FCF9563-2C4A-4E06-AFD5-9527F9AB66F2}

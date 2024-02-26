@@ -1,4 +1,4 @@
-﻿using Blazr.SyncronisationContext;
+﻿using Blazr.Async;
 
 BlazrSynchronisationContext sc = new BlazrSynchronisationContext();
 sc.Start();

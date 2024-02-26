@@ -6,8 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Blazr.SyncronisationContext\Blazr.SyncronisationContext.csproj" />
-  </ItemGroup>
-
 </Project>

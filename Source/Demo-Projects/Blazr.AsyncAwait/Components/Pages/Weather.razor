@@ -1,63 +1,49 @@
 ﻿@page "/weather"
-
+@implements IHandleEvent
 <PageTitle>Weather</PageTitle>
-
+@using Blazr.Async
 <h1>Weather</h1>
 
-<p>This component demonstrates showing data.</p>
+<p>Weather, but not as you know it.</p>
+<div>
+    <button class="btn btn-primary" @onclick="OnGetTemperatureAsync">Get the Temperature</button>
+</div>
 
-@if (forecasts == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Temp. (C)</th>
-                <th>Temp. (F)</th>
-                <th>Summary</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var forecast in forecasts)
-            {
-                <tr>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
-                    <td>@forecast.Summary</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<div class="bg-dark text-white m-2 p-2">
+    @if (_processing)
+    {
+        <pre>Waiting on Gauge</pre>
+    }
+    else
+    {
+        <pre>Temperature &deg;C : @(_temperature?.ToString() ?? "null")</pre>
+    }
+</div>
 
 @code {
-    private WeatherForecast[]? forecasts;
+    private int? _temperature;
+    private bool _processing;
 
-    protected override async Task OnInitializedAsync()
+    private Task OnGetTemperatureAsync()
     {
-        // Simulate asynchronous loading to demonstrate a loading indicator
-        await Task.Delay(500);
+        _processing = true;
+        StateHasChanged();
 
-        var startDate = DateOnly.FromDateTime(DateTime.Now);
-        var summaries = new[] { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
-        forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        var awaiter = TemperatureGauge.GetTemperatureAsync().GetAwaiter();
+
+        awaiter.OnCompleted(() =>
         {
-            Date = startDate.AddDays(index),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = summaries[Random.Shared.Next(summaries.Length)]
-        }).ToArray();
+            _temperature = awaiter.GetResult();
+            _processing = false;
+            StateHasChanged();
+        });
+
+        return Task.CompletedTask;
     }
 
-    private class WeatherForecast
-    {
-        public DateOnly Date { get; set; }
-        public int TemperatureC { get; set; }
-        public string? Summary { get; set; }
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-    }
+    // Overrides the ComponentBase handler
+    // removing all the automatic calls to StateHasChanged
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem item, object? arg)
+        => item.InvokeAsync(arg);
+
 }

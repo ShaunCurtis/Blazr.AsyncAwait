@@ -1,312 +1,220 @@
 # The Async Series - Awaitables and Awaiters
 
-The Await of *Async/Await* needs something to await.  Any method that is awaited need to be *awaitable*. Task Parallel programming defines an *awaitable* pattern.
+Any method marked with `await` must be *awaitable*.  The *awaitable* pattern implements a single method.
 
 ```csharp
-public object Awaitable
-{
-    public Awaiter GetAWaiter();;
-}
+    public Awaiter GetAWaiter();
 ```
 
-Very informative!  What's an *Awaiter*?
-
-Another pattern:tion.
+And the *awaiter* pattern the `awaitable` returns.
 
 ```csharp
-public struct MyAwaiter : INotifyCompletion
-{
     public bool IsCompleted;
     public void OnCompleted(Action continuation);
     public void GetResult();
-}
 ```
 
  It provides: 
 
-1. A bool property [normally set as readonly] to check if the awaitable is complete.
+1. A bool readonly property to check if the awaitable is complete.
 2. A method to post continuations to be run when the awaitable is complete.
 3. A method to get the result on completion.
 
-We can summarise as:
+To summarise:
 
  - An *Awaitable* is an object that executes some form of asynchronous behaviour and implements a `GetAwaiter` method. 
  - An *Awaiter* is an object returned by `GetAwaiter`.
 
 `Task`, in it's various guises, implements this functionality.  It's `GetAwaiter` returns itself.
 
-## Code and Repo
-
-The code for this article is in the *Blazr.Async* and *Blazr.SyncronisationContext* libraries and the example code is in *Blazr.Awaitable.Demo* project. 
-
 ## Implementation
 
-Implementing a customer awaiter is complex.  This one re-invents the wheel: an alternative version of `Task.Delay`.  The code is for demonstration only.  Do not use this in a production system.
+Implementing a production customer awaiter is complex.  The one I'll build here is simplistic, but demonstrates the principles.
 
-### MyAwaiter
 
-This is the awaiter.  It's implemented used the *Awaiter* pattern.
+### TemperatureAwaiter
 
-```csharp
-public readonly struct MyAwaiter : INotifyCompletion
-{
-    private readonly MyAwaitable awaitable;
+This is the awaiter.  It implements used the *Awaiter* pattern.
 
-    public bool IsCompleted => awaitable.IsCompleted;
+It captures the *synchronization context* on initialization.  `IsCompleted` is false and it has an internal `Queue` of registered continuations.  
 
-    public MyAwaiter(MyAwaitable awaitable) =>  this.awaitable = awaitable;
+The background process calls `SetResult` when it completes.  This sets the result value, `IsCompleted` as true and calls `ScheduleContinuationsIfCompleted`.  
 
-    public MyAwaiter GetAwaiter() => this;
+`ScheduleContinuationsIfCompleted` manages scheduling the continuations.  It checks the state of `IsCompleted` because it's also called from `OnCompleted`.  Why? If the state of the awaiter is completed, the posted continuation needs to be scheduled immediately.  
 
-    public int GetResult() => awaitable.GetResult();
-
-    public void OnCompleted(Action continuation) =>  awaitable.OnCompleted(continuation);
-}
-```
-
-### MyAwaitable
-
-The code is fairly self-explanatory.  I've added some inline comments where appropriate.
-
-The public interface looks like this:
+`GetResult` can only return a result after the result has been set by the background process.  It uses the `SpinWait` TPL primitive to block the caller until it is set.
 
 ```csharp
-public interface IMyAwaitable
+public class TemperatureAwaiter : INotifyCompletion
 {
-    public bool IsCompleted { get; }
-    public int Result { get; }
-    public MyAwaiter GetAwaiter();
-    public MyAwaiter ConfigureAwait(bool useContext);
-    public void OnCompleted(Action continuation);
-    public abstract static MyAwaiter Idle(int period);
-}
-```
-
-1. `volatile` is used to identify fields that may be used by multiple threads.
-1. There are only private constructors: the only way to get a `MyAwaitable` instance is through static methods.
-1. Various methods are `internal`: only available to objects within the assembly i.e. `MyAwaiter`.
-
-The public skeleton of `MyAwaitable`.
-```csharp
-public class MyAwaitable
-{
-    public bool IsCompleted { get; }
-    public int Result { get; }
-    public MyAwaiter GetAwaiter();
-    public MyAwaiter ConfigureAwait(bool useContext);
-    public void OnCompleted(Action continuation);
-    public abstract static MyAwaiter Idle(int period);
-}
-```
-
-`MyAwaitable`
-
-```csharp
-public class MyAwaitable
-{
+    private volatile Queue<Action> _continuations;
+    private volatile SynchronizationContext? _synchronizationContext;
     private volatile int _result;
-    private volatile Queue<Action> _continuations = new();
-    private Timer? _timer;
-    private volatile SynchronizationContext? _capturedContext;
-    private volatile bool _completed;
-    private volatile bool _runOnCapturedContext;
 
-    public bool IsCompleted => _completed;
+    public bool IsCompleted { get; private set; }
 
-    // Private constructor.  An instance can onky bw created through static methods
-    private MyAwaitable()
+    public TemperatureAwaiter()
     {
-        // Capture the current sync context so we can run the continuation in the correct context
-        _capturedContext = SynchronizationContext.Current;
+        _continuations = new();
+        _synchronizationContext = SynchronizationContext.Current;
     }
 
-    public MyAwaiter GetAwaiter() => ConfigureAwait(true);
-
-    public MyAwaiter ConfigureAwait(bool useContext)
+    public int GetResult()
     {
-        _runOnCapturedContext = useContext;
-        // Return a new instance of the awaiter
-        return new MyAwaiter(this);
+        var wait = new SpinWait();
+        while (!this.IsCompleted)
+            wait.SpinOnce();
+        return _result;
+    }
+
+    public void SetResult(int value)
+    {
+        _result = value;
+        this.IsCompleted = true;
+        this.ScheduleContinuationsIfCompleted();
     }
 
     public void OnCompleted(Action continuation)
     {
         _continuations.Enqueue(continuation);
-        this.ScheduleContinuationIfCompleted();
+        // We need to run the queued continuation immediately if the awaitable has already completed
+        this.ScheduleContinuationsIfCompleted();
     }
 
-    private void ScheduleContinuationIfCompleted()
+    private void ScheduleContinuationsIfCompleted()
     {
-        // Do nothing if the awaitable is still running
-        if (!_completed)
+        if (!this.IsCompleted)
             return;
 
-        // The awaitable has completed.
-        // Run the continuations in the correct context based on _runOnCapturedContext
         while (_continuations.Count > 0)
         {
             var continuation = _continuations.Dequeue();
-            if (_continuations.Count() > 0)
-            {
-                var completedContinuations = new List<Action>();
 
-                if (_runOnCapturedContext && _capturedContext != null)
-                    _capturedContext.Post(_ => continuation(), null);
+            if (_synchronizationContext != null)
+                _synchronizationContext.Post(_ => continuation(), null);
 
-                else
-                    continuation();
-            }
+            else
+                continuation();
         }
     }
+}
 ```
 
-The static method to get an Idle.  It sets up the timer and then spins off a thread to wait for `IsCompleted` to complete and returns the `awaiter`.  
+### TemperatureGauge
 
-The spun off thread uses a `SpinWait` loop to do the waiting.  When `IsCompleted` is true, it schedules the completion based on `_runOnCapturedContext`.  
+Most of the code is fairly self-explanatory. `TemperatureGauge` implements `GetAwaiter` so can be awaited.
 
-1. If true [the default], on the captured synchonisation context [if it's not null] or 
-1. on the current thread if false or no synchonisation context exists. 
- 
-`SpinWait` is a *TPL* primitive object to provide a low CPU utilization loop on the thread.  Check CPU utilization in the debugger.
+`GetTemperatureAsync` creates a new instance of `TemperatureGauge`,  spins off an anonymous method to get the actual value to another thread and returns `TemperatureGauge`.  The spunoff method emulates requesting and reading the sensor from a sensor network and then calls `SetResult` to complete the awaiter. 
 
 ```csharp
-    public static MyAwaiter Idle(int period)
+public class TemperatureGauge
+{
+    private TemperatureAwaiter _awaiter = new();
+
+    public TemperatureAwaiter GetAwaiter() => _awaiter;
+
+    public static TemperatureGauge GetTemperatureAsync()
     {
-        // Create an awaitable instance
-        MyAwaitable awaitable = new MyAwaitable();
-        // Set up the instance timer with the correct wait period
-        awaitable._timer = new(awaitable.TimerExpired, null, period, Timeout.Infinite);
-
-        // Spin off a waiter on a separate thread so we can pass control back [Yield] to the caller.
-        // Check CPU usage to confirm low usage footprint
-        ThreadPool.QueueUserWorkItem(awaitable.WaitOnCompletion);
-
-        // Return the awaiter to the caller
-        return awaitable.GetAwaiter();
-    }
-
-    // Schedule the continuation when the timer expires and sets _completed to true.
-    internal void WaitOnCompletion(object? state)
-    {
-        SynchronizationContext.SetSynchronizationContext(_capturedContext);
-        Utilities.LogToConsole("MyAwaitable waiting on timer to expire.");
-
-        var wait = new SpinWait();
-        while (!_completed)
-            wait.SpinOnce();
-
-        this.ScheduleContinuationIfCompleted();
+        var work = new TemperatureGauge();
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            Thread.Sleep(1000);
+            work._awaiter.SetResult(Random.Shared.Next(-40, 60));
+        });
+        return work;
     }
 }
 ```
 
 ## Demo
 
-Here's a demno `Program`.
-
-It uses `BlazrSynchronisationContext` which is covered in another article.  It emulates a UI by posting consule writes to the the synchronisation context.
+`OnGetTemperatureAsync` isn't awaited.  It implements asynchronous behaviour directly.  It calls `GetTemperatureAsync` and get's it's waiter.  It then schedules the continuation and returns a completed Task.  The continuation will be run when the background process completes.
 
 ```csharp
-BlazrSynchronisationContext sc = new BlazrSynchronisationContext();
-SynchronizationContext.SetSynchronizationContext(sc);
-sc.Start();
+@page "/weather"
+@implements IHandleEvent
+<PageTitle>Weather</PageTitle>
+@using Blazr.Async
+<h1>Weather</h1>
 
-PostToUI("Application started - hit a key to start");
+<p>Weather, but not as you know it.</p>
+<div>
+    <button class="btn btn-primary" @onclick="OnGetTemperatureAsync">Get the Temperature</button>
+</div>
 
-// wait for a keyboard click to start
-Console.ReadLine();
-
-PostToUI("Application => Start running DoWorkAsync.");
-
-sc.Post((state) => { _ = DoWorkAsync(); }, null);
-
-PostToUI("Application => After DoWorkAsync Yields.");
-
-// wait for a keyboard click to start
-Console.ReadLine();
-
-PostToUI("Application => Start running DoWorkAsynVoid.");
-
-sc.Post(DoWorkAsyncVoid, null);
-
-PostToUI("Application => After DoWorkAsyncVoid Yields.");
-
-Console.ReadLine();
-
-
-void PostToUI(string message)
-{
-    sc.Post((state) =>
+<div class="bg-dark text-white m-2 p-2">
+    @if (_processing)
     {
-        Utilities.WriteToConsole(message);
-    }, null);
-}
+        <pre>Waiting on Gauge</pre>
+    }
+    else
+    {
+        <pre>Temperature &deg;C : @(_temperature?.ToString() ?? "null")</pre>
+    }
+</div>
 
-async void DoWorkAsyncVoid(object? state)
-{
-    PostToUI("DoWorkAsync started");
-    await MyAwaitable.Idle(3000);
-    PostToUI("DoWorkAsync completed");
-}
+@code {
+    private int? _temperature;
+    private bool _processing;
 
-async Task DoWorkAsync()
-{
-    PostToUI("DoWorkAsync started");
-    await MyAwaitable.Idle(3000);
-    PostToUI("DoWorkAsync completed");
+    private Task OnGetTemperatureAsync()
+    {
+        _processing = true;
+        StateHasChanged();
+
+        var awaiter = TemperatureGauge.GetTemperatureAsync().GetAwaiter();
+
+        awaiter.OnCompleted(() =>
+        {
+            _temperature = awaiter.GetResult();
+            _processing = false;
+            StateHasChanged();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    // Overrides the ComponentBase handler
+    // removing all the automatic calls to StateHasChanged
+    Task IHandleEvent.HandleEventAsync(EventCallbackWorkItem item, object? arg)
+        => item.InvokeAsync(arg);
+
 }
 ```
 
+### ConfigureAwait
 
-What you'll see is:
+Calling `ConfigureAwait` on an *awaitable* doesn't set status fields in the awaitable to configure where the contuation is run.
 
-1. The application running on thread 1.
-1. The synchronisation context message loop running on thread 9.
-1. The awaitable running on thread 10.
-1. The timer callback running on thread 5.
-
-All the UI work is done on the synchronisation context running on Thread 9. 
-
-```text
-         ===> Message Loop Running - ThreadId: 9 - SyncContext: 62476613
-    Application started - hit a key to start - ThreadId: 9 - SyncContext: 62476613
-
---->[key press]
-
-    Application => Start running  DoWorkAsync. - ThreadId: 9 - SyncContext: 62476613
-         ===> MyAwaitable waiting on timer to expire. - ThreadId: 10 - SyncContext: 62476613
-    Application => After DoWorkAsync Yields. - ThreadId: 9 - SyncContext: 62476613
-    DoWorkAsync started - ThreadId: 9 - SyncContext: 62476613
---->[Pause while timer expires]
-         ===> Timer Expired - ThreadId: 5 - SyncContext:  -- Not Set --
-    DoWorkAsync completed - ThreadId: 9 - SyncContext: 62476613
-
---->[key press]
-
-    Application => Start running  DoWorkAsynVoid. - ThreadId: 9 - SyncContext: 62476613
-         ===> MyAwaitable waiting on timer to expire. - ThreadId: 10 - SyncContext: 62476613
-    Application => After DoWorkAsyncVoid Yields. - ThreadId: 9 - SyncContext: 62476613
-    DoWorkAsync started - ThreadId: 9 - SyncContext: 62476613
---->[Pause while timer expires]
-         ===> Timer Expired - ThreadId: 5 - SyncContext:  -- Not Set --
-    DoWorkAsync completed - ThreadId: 9 - SyncContext: 62476613
-```
-
-### Some Key Points
-
-1. A call to a method returning a Task returns a `Task<T>`, not `T`.  The way you write the code:
+*Do Some Work* will still be run on the  *synchronisation context*, not be run on a threadpool thread.  `task.ConfigureAwait` returns a  `ConfiguredTaskAwaitable` which in the code is discarded. returns a `ConfiguredTaskAwaiter`
 
 ```csharp
-var result = await DoSomeAsyncWork();
+var task = Task.CompletedTask;
+task.ConfigureAwait(ConfigureAwaitOptions.None);
+task.ContinueWith(_ =>
+{
+    //Do some work
+});
 ```
 
-suggests result is `T`.  The Dev environment even tells you so.  That's just syntactic sugar.  Behind the scenes the code is calling `GetResult()` on the completed `Task<T>`.
+This will do as requested.
 
-Miss out the `await` and `result` with now be a `Task<T>.
+```csharp
+var configuredAwaitable = Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.None);
+var configuredAwaiter = configuredAwaitable.GetAwaiter();
+configuredAwaiter.OnCompleted(() =>
+{
+    //Do some work
+});
+```
+
+## Some Key Points
+
+1. A call to a method returning a Task returns a `Task<T>`, not `T`.  The way you write the code suggests result is `T`.  The Dev environment even tells you so.  That's just syntactic sugar.  Behind the scenes the code is calling `GetResult()` on the completed `Task<T>`.  Miss out the `await` and `result` with now be a `Task<T>.
   
-2. `Task` and all it incarnations respect `SynchronizationContext.Current`, and run the continuation on that context if `ConfigureAwait` is true [the default]. 
+2. `Task` and all it incarnations respect `SynchronizationContext.Current`, and run the continuation on that context if configured to do so through `ConfigureAwait`. 
 
-3. Async methods that need to await a result [from another process] must run on a separate background thread.  The action of awaiting blocks the thread.  Switching this await, along with responsibility to schedule the continuations, to a separate thread frees the initial thread.  This is the process of yielding.  You can see this in the example above. 
+3. Async methods that need to await a result [from another process] must run on a separate background thread.  The action of awaiting blocks the thread.  Switching this await, along with responsibility to schedule the continuations, to a separate thread frees the main thread.  This is the process of yielding.  You can see this in the example above. 
 
 4. You can set more than one continuation on an awaitable, and you can pass a continuation to a completed awaiter and it will be executed.  
 
