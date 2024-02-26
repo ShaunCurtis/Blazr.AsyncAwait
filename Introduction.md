@@ -14,15 +14,15 @@ What we also see is the need for synchronisation.  We need a mechansism to keep 
 
 ## The Task Parallel Library
 
-Welcome to the `Task Parallel Library` - The DotNet core code library to program asynchronous behaviour in our applications.  
+The *Task Parallel Library* is the DotNet core code library that provides the infrastructure to build asynchronous behaviour in our applications.  
 
 > There's a Microsoft article on making a cold serial breakfast or hot asynchronous breakfast that makes interesting reading.
 
-At first the library provided a set of primitives to build applications.  It was very easy to get things wrong.  Over time it has matured.  Today *Async/Await* is the almost ubiquitous standard for writing asynchronous code.
+The library provides a set of primitive building blocks and high level objects and functionality built on those primitives.  *Async/Await* is the standard for writing asynchronous code.  Unless you write backend low level libraries, you'll have little cause to use anything else.  
 
-Unless you write backend low level libraries, you'll have little cause to use anything other than *Async/Await*.  That said, you shouldn't neglect the need to understand at a conceptual level how asynchronous behaviour is implemented.  It's still relatively easy to get it wrong.  Without the knowledge, you're fishing in the dark or resorting to asking a question on Stack Overflow.
+That said, you shouldn't neglect the need to understand at a conceptual level how asynchronous behaviour is implemented.  It's still relatively easy to get it wrong.  Without the knowledge, you're fishing in the dark or resorting to asking a question on Stack Overflow.
 
-This series of articles provides an in depth look at many of the key building blocks that make *Async/Await* so wonderful that we rarely have cause to ask what's going on below the surface.
+This series of articles provides an in depth look at many of the key building blocks that make *Async/Await* so ubiquitous that we rarely have cause to ask what's going on below the surface.
 
 The articles are *Blazor* centric and cover some of the async quirks that Blazor throws up.
 
