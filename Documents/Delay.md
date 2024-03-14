@@ -4,7 +4,7 @@
 
 It returns a running awaitable`Task` [Completed = `false`]  which completes when the timer expires.  The continuation runs either on the Synchronisation Context or the Threadpool scheduler, depending on the `ConfigureAwait` setup.
 
-In Blazor we often use it to emulate an async task in testing or demos, or to yield control during a synchronous block of code to display progress.
+In Blazor we often use it to emulate an async task in testing or demos, or to yield control during a synchronous block of code to say, update a progress bar in the UI.
 
 In this article I'll build a delay class to demonstrate how it works
 
@@ -39,7 +39,7 @@ Welcome to your new app.
 }
 ```
 
-First We need to implement the *Awatable* and *Awaiter* pattern.  Only objects that return an *Awaiter* can be awaited.  This implementation uses a single static constructor.
+The first step is to implement the *Awatable* and *Awaiter* patterns.  Only objects that return an *Awaiter* can be awaited.  In this implementation we have a single static constructor method `BlazrDelay.Delay`.
 
 ```csharp
 using System.Runtime.CompilerServices;
@@ -65,7 +65,7 @@ Next we:
 1. Cache the *synchronisation context* on initialization.
 2. Set up an internal `Queue` to hold any posted continuations.
 3. Define a private `System.Threading.Timer` which is started on initialization.
-4. A Callback for the timer which sets the *awaiter* to complete, disposes the timer and schedules the completions.
+4. Define a Callback for the timer which sets the *awaiter* to complete, disposes the timer and schedules the completions.
 
 ```csharp
     private volatile SynchronizationContext? _synchronizationContext = SynchronizationContext.Current;
@@ -120,7 +120,7 @@ Some Important points:
 
 Timers are *posted* to the timer queue when they are created.  The Timer loop that services this queue runs on a background thread. The Timer service has responsibility for calling the callback when the timer expires.
  
-The static `Delay` creates and instance of `BlazrDelay` with a timer queued on the timer queue, returns the new instance of itself and completes.  The thread, in our case the *synchonisation context*, is free to run any queued work.
+The static `Delay` creates an instance of `BlazrDelay` with a timer queued on the timer queue, returns the new instance of itself and completes.  The thread, in our case the *synchonisation context*, is free to run any queued work.
 
 When the timer expires, the timer loop schedules the callback on a threadpool thread.  It's a background singleton service with no concept of a user context *synchonisation context*.
 
